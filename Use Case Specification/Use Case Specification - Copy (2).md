@@ -2,7 +2,7 @@
 
 **Use Case ID:** UC-01  
 **Use Case Name:** Reserve Parking Spot  
-**Relevant Requirements:** _Reference to requirements document (e.g., FR-XX, NFR-XX)_  
+**Relevant Requirements:** \_Reference to requirements document
 **Primary Actor:** {Main sub-system/entity that initiates use}
 
 ---
