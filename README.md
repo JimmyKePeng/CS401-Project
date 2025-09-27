@@ -2,13 +2,6 @@
 
 # Software Requirements Specification
 
-## Revision History
-
-| Date      | Revision | Description                                                                                                                         | Author      |
-| --------- | -------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------- |
-| 9/14/2025 | 1.0      | Initial Version                                                                                                                     | Kegang Peng |
-| 9/18/2025 | 1.1      | 4 of 5 Group Members attended. Chris did not attend. 50 Minutes looking over our SRS document and filling out parts of all sections | -           |
-
 # Table of Contents
 
 1. Purpose
