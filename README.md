@@ -2,6 +2,14 @@
 
 # Software Requirements Specification
 
+| Authors                    |
+| -------------------------- |
+| Tuan Do                    |
+| Matthew Gomez Smith        |
+| Christopher Ovando Morales |
+| Kegang Peng                |
+| Diego Ruiz Paredes         |
+
 # Table of Contents
 
 1. Purpose
