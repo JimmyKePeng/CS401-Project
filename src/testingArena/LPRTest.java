@@ -32,7 +32,7 @@ class LPRTest {
 	}
 	//getLPRid
 	@ParameterizedTest
-	@Order(1)
+	@Order(1) //first in order due to static count variable
 	@ValueSource(ints = {1,2,3,4,5,6})
 	void getLPRidTest(int values) {
 		BlockingQueue<String> testQueue = new LinkedBlockingQueue<String>();
@@ -41,11 +41,16 @@ class LPRTest {
 		assertEquals((values-1), lpr2.getLPRid());
 	}
 	//randomPlate
-	@RepeatedTest(10)
+	@RepeatedTest(100)
 	@Order(3)
 	void randomPlateTest() {
 		LicensePlateReader lpr = new LicensePlateReader();
-		assertTrue(lpr.randomPlate().length() > 5 && lpr.randomPlate().length() < 7);
+		char[] lprPlate = lpr.randomPlate().toCharArray();
+		for(char x:lprPlate)
+			if(!Character.isDigit(x) && !Character.isLetter(x)) fail(x + " is not alphanumeric");
+		assertTrue(lpr.randomPlate().length() == 6);
+		//Checks if alphanumeric and correct length
 	}
+	
 	//Unable to test run(), stop()
 }
