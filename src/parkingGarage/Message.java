@@ -5,8 +5,10 @@ import java.io.Serializable;
 public class Message implements Serializable {
 	private MsgTypes msgType;
 
+	// Message contain the msgType/Operator/Ticket
+	// theres no Report in Message because Operator will contain a Report
 	private int garageID;
-	private Operator operator; // to be implement
+	private Operator operator;
 	private Ticket ticket;
 
 	public Message() {

@@ -276,7 +276,8 @@ public class PGMS {
 				int index = random.nextInt(unPaidList.size());
 
 				ticket = unPaidList.get(index); // Grab random ticket to send to client
-				ticket.setGuiID(inMsg.getTicket().getGuiID());
+				ticket.setGuiID(inMsg.getTicket().getGuiID()); // so the client know which GUI requesting the exit
+																// ticket
 			}
 
 			return ticket; // return random ticket to client

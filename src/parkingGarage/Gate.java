@@ -4,7 +4,6 @@ public class Gate implements Runnable {
 
 	// Private Variables
 	private static int count = 0;
-//	private GateSensor sensor;
 	private int id;
 	private Location gateLocation;
 	private volatile boolean isOpen;
@@ -13,7 +12,6 @@ public class Gate implements Runnable {
 	// Default Constructor
 	public Gate() {
 		this.id = count++;
-//		this.sensor = new GateSensor();
 		this.gateLocation = Location.Exit;
 		this.isOpen = false;
 	}
@@ -21,7 +19,6 @@ public class Gate implements Runnable {
 	// Parameterized Constructor
 	public Gate(int garageID, Location gateTypes) {
 		this.id = count++;
-//		this.sensor = new GateSensor();
 		this.gateLocation = gateTypes;
 		this.isOpen = false;
 		this.garageID = garageID;
@@ -51,19 +48,17 @@ public class Gate implements Runnable {
 		sensorThread.setDaemon(true);
 		sensorThread.start();
 
-//		System.out.println(
-//				(gateLocation == Location.Entry ? "Entry" : "Exit") + " Gate" + Integer.toString(id) + " Gate opened!");
 		isOpen = true;
 		while (isOpen) {
 			try {
-				Thread.sleep(3000); // check gate every 3 seconds
+				Thread.sleep(3000); // check gate sensor every 3 seconds
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
+			// if the sensor indicated car has left, we can exit loop and close gate;
 			if (sensor.isCarExited()) {
-//				System.out.println((gateLocation == Location.Entry ? "Entry" : "Exit") + " Gate" + Integer.toString(id)
-//						+ " Gate closed!");
 				isOpen = false;
+
 			}
 		}
 		isOpen = false;

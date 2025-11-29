@@ -18,7 +18,8 @@ public class Report implements Serializable {
 	private LocalDate creationDate;
 	private List<Ticket> tickets;
 
-	// Private variable for search report;
+	// Private variables used to search report with filters only,
+	// the rest of the time is -1;
 	private int month;
 	private int year;
 
@@ -32,7 +33,7 @@ public class Report implements Serializable {
 		this.creationDate = LocalDate.now();
 	}
 
-	// Parameterized Constructor
+	// Parameterized Constructor, create report with given garageID and Ticket list
 	public Report(int garageID, List<Ticket> tickets) {
 		this.month = -1;
 		this.year = -1;
@@ -45,13 +46,15 @@ public class Report implements Serializable {
 		calculateTotalFee();
 	}
 
-	// use this constructor to load report from file
+	// use this constructor to load report from txt file
 	public Report(String fileName) {
 		File file = new File(fileName);
 
 		if (file.exists()) {
 			try (Scanner scanner = new Scanner(file)) {
-				// Parse header line
+				// Parse header line, first line on the txt file will contain
+				// garageID,avgStayTime,totalFee, creationDate because we used the toString
+				// method to write to txt file, we are doing the reverse now
 				String header = scanner.nextLine().trim();
 				String[] parts = header.split(",");
 
@@ -73,7 +76,8 @@ public class Report implements Serializable {
 				e.printStackTrace();
 			}
 		} else {
-
+			// if no report file is found, set everything to -1. so we know this is a null
+			// report
 			this.garageID = -1;
 			this.avgStayTime = -1;
 			this.totalFee = -1;
@@ -94,8 +98,9 @@ public class Report implements Serializable {
 			// Add amount of every ticket duration of stay into 'duration'
 			duration = duration.plus(t.getDurationOfStay());
 		}
-		avgStayTime = (int) duration.getSeconds() / 60 / tickets.size(); // Seconds divided by 60 divided by
-																			// PAIDTICKETS
+
+		// get the avg stay time
+		avgStayTime = (int) duration.getSeconds() / tickets.size();
 
 	}
 
@@ -106,6 +111,8 @@ public class Report implements Serializable {
 		for (Ticket t : tickets) {
 			totalFee += t.getFee();
 		}
+
+		// round it to two decimal
 		totalFee = Math.round(totalFee * 100.0) / 100.0;
 	}
 
@@ -145,23 +152,6 @@ public class Report implements Serializable {
 		return tickets;
 	}
 
-	public String getReportInfo() {
-		StringBuilder sb = new StringBuilder();
-		sb.append(garageID).append(",").append(avgStayTime).append(",").append(totalFee).append(",")
-				.append(creationDate).append("\n");
-		return sb.toString();
-	}
-
-	public String getTicketStrings() {
-		StringBuilder sb = new StringBuilder();
-		// Append all tickets, one per line
-		for (Ticket t : tickets) {
-			sb.append(t.toString());
-		}
-
-		return sb.toString();
-	}
-
 	@Override
 	public String toString() {
 		// StringBuilder object to append all parts of this report into a string
@@ -177,4 +167,25 @@ public class Report implements Serializable {
 		return sb.toString();
 
 	}
+
+	/// ================== UN-USED methods ==================
+	// return a string contain the basic information for the report
+	public String getReportInfo() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(garageID).append(",").append(avgStayTime).append(",").append(totalFee).append(",")
+				.append(creationDate).append("\n");
+		return sb.toString();
+	}
+
+	// turn all the tickets in the report to a string
+	public String getTicketStrings() {
+		StringBuilder sb = new StringBuilder();
+		// Append all tickets, one per line
+		for (Ticket t : tickets) {
+			sb.append(t.toString());
+		}
+
+		return sb.toString();
+	}
+
 }

@@ -233,7 +233,8 @@ public class ParkingGarageClient {
 					e.printStackTrace();
 				}
 			};
-			// === DEFINE THE CALLBACK FUNCTION AND PASS TO THE GUI ===
+			// ==== DEFINE THE CALLBACK FUNCTION AND PASS TO THE GUI ======
+			// ====so the GUI can tell ParkingGarage to do certain task ===
 			// Create a GUI with this Garage ID and the
 			driverGUI1 = new DriverGUI(garageID, getUnpaidCallback, paidTicketCallback);
 			new Thread(driverGUI1).start(); // Runs the first driver GUI in a thread
