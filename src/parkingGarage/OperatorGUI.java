@@ -25,13 +25,14 @@ import javax.swing.SwingUtilities;
 
 public class OperatorGUI implements Runnable {
 
-	// private boolean isConnected = false;
 	private boolean isLoggedIn = false;
-
-	// Operator data
-	// private Operator operator;
 	private int garageID;
+
+	// After OperatorGUI displayed a report, there's an option to save this report
 	private Report reportForSaving;
+
+	// Callback functions, when buttons are clicked on OperatorGUI, it will call one
+	// of these functions to trigger ParkingGarage to do certain task
 	OperatorGUILoginCB operatorLoginCallback;
 	GUIgetReportCB operatorGetReportCallback;
 	GUISearchTicketCB operatorGUISearchTicketCallback;
@@ -63,10 +64,11 @@ public class OperatorGUI implements Runnable {
 	private JButton setRateButton;
 	private JTextField inputRateField;
 
+	// must pass in these 5 callback functions from parkingGarage to have
+	// OperatorGUi work properly
 	public OperatorGUI(int garageID, OperatorGUILoginCB operatorLoginCallback, GUIgetReportCB operatorGetReportCallback,
 			GUISearchTicketCB operatorGUISearchTicketCallback, OperatorGUISetRateCB operatorGUISetRateCallback,
 			GUIgetReportByMonthYearCB getReportByMonthYearCallback) {
-
 		this.garageID = garageID;
 		this.reportForSaving = null;
 		this.operatorLoginCallback = operatorLoginCallback;
@@ -90,13 +92,220 @@ public class OperatorGUI implements Runnable {
 		mainFrame.setSize(1200, 600);
 		mainFrame.setLocationRelativeTo(null);
 
-		// Create both panels
-		createLoginPanel();
+		// Create both panels, so we can switch panel after successful login
+		createLoginPanel(); // scroll to the bottom to see implementation
 		createDashboardPanel();
 
 		mainFrame.setContentPane(loginPanel);
 		mainFrame.setVisible(true);
 
+	}
+
+	// This function will be called when login button is clicked on login screen
+	private void login() {
+		// get operator log in username/pw from GUI
+		String username = usernameField.getText().trim();
+		String pw = new String(passwordField.getPassword());
+		statusLabel.setText("");
+
+		// call the callback function from ParkingGarage, ParkingGarage will send a
+		// Message to server to authenticate the username/pw
+		operatorLoginCallback.run(username, pw);
+	}
+
+	// This function will be called when logout button is clicked on dashboard
+	// exit the dashboard and back to log in screen
+	private void logout() {
+		SwingUtilities.invokeLater(() -> {
+			displayArea.setText("");
+			searchField.setText("");
+			mainFrame.setContentPane(loginPanel);
+			mainFrame.revalidate();
+			mainFrame.repaint();
+		});
+	}
+
+	// Once Server sends a Message indicating that the Operator pw/username is
+	// correct, ParkingGarage will call this function to switch the login screen to
+	// dashboard
+	public void loggedInSuccess() {
+		SwingUtilities.invokeLater(() -> {
+			isLoggedIn = true;
+			passwordField.setText("");
+			usernameField.setText("");
+			mainFrame.setContentPane(dashboardPanel);
+			mainFrame.revalidate();
+			mainFrame.repaint();
+		});
+
+	}
+
+	// If Server sends a Message indicating that the Operator username/pw is not
+	// correct, ParkingGarage will call this function to display invalid
+	// username/pw
+	public void loggedInFail() {
+		SwingUtilities.invokeLater(() -> {
+			statusLabel.setText("Invalid username or password");
+			passwordField.setText("");
+			usernameField.setText("");
+		});
+	}
+
+	// This function will be called when setRate button is clicked on dashboard
+	private void setRate() {
+		SwingUtilities.invokeLater(() -> {
+			String inputRate = inputRateField.getText().trim();
+			double rate = Double.parseDouble(inputRate);
+			// get the new rate from GUI and check if its reasonable
+			if (rate > 0 && rate < 10) {
+
+				// call callback function, so ParkingGarage will save/overwrite new rate on txt
+				// file
+				operatorGUISetRateCallback.run(rate);
+				inputRateField.setText("");
+				JOptionPane.showMessageDialog(null, "New parking rate have been set to $" + rate + " per second",
+						"Success", JOptionPane.INFORMATION_MESSAGE);
+			} else {
+				inputRateField.setText("");
+				JOptionPane.showMessageDialog(null, "rate must be between 0 and $10 per second", "Invalid input",
+						JOptionPane.INFORMATION_MESSAGE);
+			}
+
+		});
+	}
+
+	// This function will be called when getReport button is clicked on dashboard
+	private void getReport() {
+		String monthString = monthField.getText().trim();
+		String yearString = yearField.getText().trim();
+		int month = -1;
+		int year = -1;
+
+		// get input month and validate month
+		try {
+			month = Integer.parseInt(monthString);
+		} catch (NumberFormatException e) {
+		}
+		if (month != -1) {
+			if (month < 1 || month > 12) {
+				JOptionPane.showMessageDialog(null, "Month must be between 1 - 12", "Invalid input",
+						JOptionPane.INFORMATION_MESSAGE);
+				return;
+			}
+		}
+
+		// get input year and validate year
+		try {
+			year = Integer.parseInt(yearString);
+		} catch (NumberFormatException e) {
+		}
+
+		if (year != -1) {
+			if (year < 1900 || year > 2200) {
+				JOptionPane.showMessageDialog(null, "Invalid year", "Invalid input", JOptionPane.INFORMATION_MESSAGE);
+				return;
+			}
+
+		}
+		if (month == -1 && year == -1) {
+			// if no month and year are given, simply call the getReport callback function
+			// to get all the paid tickets as a report
+			operatorGetReportCallback.run(garageID);
+		} else {
+
+			// if month or year is given, call the function that will filter out the
+			// month/year and create the report
+			getReportByMonthYearCallback.run(garageID, month, year);
+		}
+
+	}
+
+	// Once ParkingGarage receive a report from Server, ParkingGarage will call this
+	// function and pass in report so this GUI can display the report
+	public void displayReport(Report report) {
+		SwingUtilities.invokeLater(() -> {
+			if (report != null) {
+				this.reportForSaving = report;
+				// use ReportFormatter to format the report
+				String text = ShareFunctions.formatReport(report);
+				displayArea.setText(text);
+				saveReportButton.setEnabled(true);
+			} else {
+				displayArea.setText("No report found");
+
+			}
+			displayArea.setCaretPosition(0);
+		});
+
+	}
+
+	// This function will be called when searchTicket button is clicked on dashboard
+	private void searchTicket() {
+		SwingUtilities.invokeLater(() -> {
+			String licensePlate = searchField.getText().trim().toUpperCase();
+			if (!licensePlate.equals("")) {
+				// if the entered license plate is not empty. call this callback function, then
+				// ParkingGarage will send a Message with msgType of SEARCHTICKET to Server to
+				// search a Ticket with this license plate
+				operatorGUISearchTicketCallback.run(licensePlate);
+			}
+			// erase the entered text
+			searchField.setText("");
+		});
+	}
+
+	// this is the next step after searchTicket button is clicked on dashboard, Once
+	// ParkingGarage(client) receive a respond Message with msgType of SEARCHTICKET,
+	// ParkingGarage will call this function to display the ticket
+	public void displayTicket(Ticket ticket) {
+		SwingUtilities.invokeLater(() -> {
+			if (ticket.getEntryTime() == null) {
+				// that means this ticket not found;
+				displayArea.setText(ticket.getLicensePlate() + " is not found");
+				displayArea.setCaretPosition(0);
+			} else {
+				// use ReportFormatter to format the ticket
+				String text = ShareFunctions.formatTicket(ticket);
+				displayArea.setText(text);
+				displayArea.setCaretPosition(0);
+			}
+		});
+
+	}
+
+	// This function will be called when saveReport button is clicked on dashboard
+	// this button will be enable if only if getReport button is clicked and Server
+	// return a non null report to ParkingGarage
+	private void saveReport() {
+		String filename = filenameField.getText().trim();
+		// save the report in a txt file with the input filename
+		// ShareFunctions.saveReport is used by OperatorGUI and OwnerGUI to save the
+		// given report and filename
+		boolean isSaved = ShareFunctions.saveReport(this.reportForSaving, filename);
+		if (isSaved) {
+			filenameField.setText("");
+			saveReportButton.setEnabled(false);
+			JOptionPane.showMessageDialog(null, "Report saved to " + filename, "Success",
+					JOptionPane.INFORMATION_MESSAGE);
+		} else {
+			// it wont be saved if the the filename string is empty
+			JOptionPane.showMessageDialog(null, "Filename can't be empty", "Failed", JOptionPane.INFORMATION_MESSAGE);
+		}
+	}
+
+	// This function will be called when loadReport button is clicked on dashboard
+	private void loadReport() {
+		String filename = searchReportFilenameField.getText().trim();
+
+		// user must input a filename to load the report from txt file
+		Report report = ShareFunctions.loadReport(filename);
+
+		searchReportFilenameField.setText("");
+		if (report != null && report.getGarageId() != -1) {
+			displayReport(report);
+		} else {
+			JOptionPane.showMessageDialog(null, "Report does not exist", "Failed", JOptionPane.INFORMATION_MESSAGE);
+		}
 	}
 
 	private void createLoginPanel() {
@@ -150,11 +359,6 @@ public class OperatorGUI implements Runnable {
 		loginPanel.add(statusLabel, gbc);
 
 	}
-
-	// Creates the operator dashboard panel
-	// Button: GetReport
-	// License Plate:
-	// Button: Search
 
 	private void createDashboardPanel() {
 		dashboardPanel = new JPanel(new BorderLayout(10, 10));
@@ -251,167 +455,4 @@ public class OperatorGUI implements Runnable {
 		JScrollPane scrollPane = new JScrollPane(displayArea);
 		dashboardPanel.add(scrollPane, BorderLayout.CENTER);
 	}
-
-	private void login() {
-		// get operator log in username/pw from GUI
-		String username = usernameField.getText().trim();
-		String pw = new String(passwordField.getPassword());
-		statusLabel.setText("");
-		// call the callback function from ParkingGarage
-		operatorLoginCallback.run(username, pw);
-
-	}
-
-	private void logout() {
-		SwingUtilities.invokeLater(() -> {
-			displayArea.setText("");
-			searchField.setText("");
-			mainFrame.setContentPane(loginPanel);
-			mainFrame.revalidate();
-			mainFrame.repaint();
-		});
-	}
-
-	public void loggedInSuccess() {
-		SwingUtilities.invokeLater(() -> {
-			isLoggedIn = true;
-			passwordField.setText("");
-			usernameField.setText("");
-			mainFrame.setContentPane(dashboardPanel);
-			mainFrame.revalidate();
-			mainFrame.repaint();
-		});
-
-	}
-
-	public void loggedInFail() {
-		SwingUtilities.invokeLater(() -> {
-			statusLabel.setText("Invalid username or password");
-			passwordField.setText("");
-			usernameField.setText("");
-		});
-	}
-
-	private void setRate() {
-		SwingUtilities.invokeLater(() -> {
-			String inputRate = inputRateField.getText().trim();
-			double rate = Double.parseDouble(inputRate);
-			if (rate > 0 && rate < 10) {
-				operatorGUISetRateCallback.run(rate);
-				inputRateField.setText("");
-				JOptionPane.showMessageDialog(null, "New parking rate have been set to $" + rate + " per second",
-						"Success", JOptionPane.INFORMATION_MESSAGE);
-			} else {
-				inputRateField.setText("");
-				JOptionPane.showMessageDialog(null, "rate must be between 0 and $10 per second", "Invalid input",
-						JOptionPane.INFORMATION_MESSAGE);
-			}
-
-		});
-	}
-
-	private void getReport() {
-		String monthString = monthField.getText().trim();
-		String yearString = yearField.getText().trim();
-		int month = -1;
-		int year = -1;
-
-		try {
-			month = Integer.parseInt(monthString);
-		} catch (NumberFormatException e) {
-		}
-		if (month != -1) {
-			if (month < 1 || month > 12) {
-				JOptionPane.showMessageDialog(null, "Month must be between 1 - 12", "Invalid input",
-						JOptionPane.INFORMATION_MESSAGE);
-				return;
-			}
-		}
-		try {
-			year = Integer.parseInt(yearString);
-		} catch (NumberFormatException e) {
-		}
-		if (year != -1) {
-			if (year < 1900 || year > 2200) {
-				JOptionPane.showMessageDialog(null, "Invalid year", "Invalid input", JOptionPane.INFORMATION_MESSAGE);
-				return;
-			}
-
-		}
-		if (month == -1 && year == -1) {
-			operatorGetReportCallback.run(garageID);
-		} else {
-			getReportByMonthYearCallback.run(garageID, month, year);
-		}
-
-	}
-
-	public void displayReport(Report report) {
-		SwingUtilities.invokeLater(() -> {
-			if (report != null) {
-				this.reportForSaving = report;
-				// use ReportFormatter to format the report
-				String text = ShareFunctions.formatReport(report);
-				displayArea.setText(text);
-				saveReportButton.setEnabled(true);
-			} else {
-				displayArea.setText("No report found");
-
-			}
-			displayArea.setCaretPosition(0);
-		});
-
-	}
-
-	private void searchTicket() {
-		SwingUtilities.invokeLater(() -> {
-			String licensePlate = searchField.getText().trim().toUpperCase();
-			if (!licensePlate.equals("")) {
-				operatorGUISearchTicketCallback.run(licensePlate);
-			}
-			searchField.setText("");
-		});
-	}
-
-	public void displayTicket(Ticket ticket) {
-
-		SwingUtilities.invokeLater(() -> {
-			if (ticket.getEntryTime() == null) {
-				// that means this ticket not found;
-				displayArea.setText(ticket.getLicensePlate() + " is not found");
-				displayArea.setCaretPosition(0);
-			} else {
-				// use ReportFormatter to format the ticket
-				String text = ShareFunctions.formatTicket(ticket);
-				displayArea.setText(text);
-				displayArea.setCaretPosition(0);
-			}
-		});
-
-	}
-
-	private void saveReport() {
-		String filename = filenameField.getText().trim();
-		boolean isSaved = ShareFunctions.saveReport(this.reportForSaving, filename);
-		if (isSaved) {
-			filenameField.setText("");
-			saveReportButton.setEnabled(false);
-			JOptionPane.showMessageDialog(null, "Report saved to " + filename, "Success",
-					JOptionPane.INFORMATION_MESSAGE);
-		} else {
-			JOptionPane.showMessageDialog(null, "Filename can't be empty", "Failed", JOptionPane.INFORMATION_MESSAGE);
-		}
-	}
-
-	private void loadReport() {
-		String filename = searchReportFilenameField.getText().trim();
-		Report report = ShareFunctions.loadReport(filename);
-		searchReportFilenameField.setText("");
-		if (report != null && report.getGarageId() != -1) {
-			displayReport(report);
-		} else {
-			JOptionPane.showMessageDialog(null, "Report does not exist", "Failed", JOptionPane.INFORMATION_MESSAGE);
-		}
-	}
-
 }

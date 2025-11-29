@@ -48,14 +48,18 @@ public class LicensePlateReader implements Runnable { // (LPR)
 				Thread.sleep(5000); // Pretend Cars come in every 5seconds
 				if (LPRLocation == Location.Entry) { // Ensure this is an Entrance License Plate Reader
 					plate = randomPlate(); // Generate randomized String for license plate
-//					System.out.println(plate);			//Show License Plate
-					sharedQueue.put(plate); // Place into thread safe Queue to allow creation of new Ticket
-					new Thread(gate).start(); // Open the gate and auto close
+
+					// Place into thread safe Queue to allow creation of new Ticket.
+					// ParkingGarage will send a Message contain this plate number Ticket to Server
+					// and store it.
+					sharedQueue.put(plate);
+
+					new Thread(gate).start(); // Open the gate and it will auto close
 					while (!gate.isGateOpen()) {
 						Thread.sleep(2000); // sleep 2 second, so gate can set up sensors
 					}
 					while (gate.isGateOpen()) { // while the gate is open.
-						Thread.sleep(3000); // do nothing, keep sleeping
+						Thread.sleep(3000); // do nothing, and check it again in 3 seconds
 					}
 					// gate will be close at this point, that means car entered;
 					// start the loop again to pretend car comes in;
@@ -64,7 +68,6 @@ public class LicensePlateReader implements Runnable { // (LPR)
 					// Since we do not have a real License Plate Reader, we will skip this for now
 					// if we have one, we will have to create a callback function to connect with
 					// server to load the unpaid ticket.
-
 				}
 			} catch (Exception e) {
 				stop();

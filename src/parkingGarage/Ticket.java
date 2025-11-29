@@ -15,6 +15,9 @@ public class Ticket implements Serializable {
 	private LocalDateTime exitTime;
 	private Duration durationOfStay;
 	private int GuiID;
+
+	// this rate is used for setting rate on garage only.
+	// the rest of the time is 0;
 	private double rate;
 
 	// Default Constructor
@@ -45,14 +48,16 @@ public class Ticket implements Serializable {
 		this.rate = 0;
 	}
 
-	// Parameterized Constructor using string from file read
+	// Parameterized Constructor using string from txt file read
+	// we used toString to save on txt file, this is the reverse
 	public Ticket(String stringFromTxtFile) {
 		String[] parts = stringFromTxtFile.split(",", -1);
-
 		garageID = Integer.parseInt(parts[0].trim());
 		licensePlate = parts[1].trim();
 		fee = Double.parseDouble(parts[2].trim());
 		paid = Boolean.parseBoolean(parts[3].trim());
+
+		// scroll all the way down to see implementation
 		this.entryTime = parseDate(parts[4]);
 		this.exitTime = parseDate(parts[5]);
 		this.durationOfStay = parseDuration(parts[6]);
@@ -162,6 +167,7 @@ public class Ticket implements Serializable {
 				+ "," + isNull(durationOfStay) + "\n";
 	}
 
+	// parse a string from txt file to LocalDateTime
 	private LocalDateTime parseDate(String s) {
 		if (s == null)
 			return null;
@@ -171,6 +177,7 @@ public class Ticket implements Serializable {
 		return LocalDateTime.parse(s);
 	}
 
+	// parse a string from txt file to Duration
 	private Duration parseDuration(String s) {
 		if (s == null)
 			return null;
