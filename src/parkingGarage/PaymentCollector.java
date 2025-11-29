@@ -9,7 +9,8 @@ public class PaymentCollector {
 	};
 
 	public boolean validatePayment() {
-		// if card number is 16 digits, we will pretend its valid card
-		return card.getCardNum().length() == 20;
+
+		return card.getCardNum().length() <= 20 && card.getCardNum().length() > 13;
+
 	}
 }

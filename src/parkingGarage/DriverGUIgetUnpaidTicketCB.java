@@ -1,5 +1,5 @@
 package parkingGarage;
 
-public interface GUIgetUnpaidTicket {
+public interface DriverGUIgetUnpaidTicketCB {
 	void run(int GuiID);
 }
