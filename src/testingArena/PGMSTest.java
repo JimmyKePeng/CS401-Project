@@ -8,9 +8,15 @@ import parkingGarage.PGMS;
 class PGMSTest {
 
 	//PGMS Has a Client Handler Perhaps we would want to run to be able to test the saving/loading
+	
 	@Test
-	void test() {
-		fail("Not yet implemented");
-	}
+    void testGetOwnerReportByMonthYear_NoGarage_ReturnsNull() {
+        Report report = PGMS.getOwnerGetReportByMonthYearCallback(50, 5, 2024);
+        assertNull(report);
+    }
+	
+	
+	
+	
 
 }
