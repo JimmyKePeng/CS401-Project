@@ -1,5 +1,6 @@
 package parkingGarage;
 
+import java.time.LocalDateTime;
 import java.io.BufferedReader;
 //java.io.*
 import java.io.EOFException;
@@ -24,17 +25,21 @@ import java.util.concurrent.ConcurrentMap;
 //Parking Garage Management System (PGMS)
 public class PGMS {
 
-	// Private Variables
+	// Private Variables	
+	private static final List<List<Ticket>> PAIDTICKETS = new ArrayList<>();
+	private static final List<List<Ticket>> UNPAIDTICKETS = new ArrayList<>();
 	private static int garageCount = 0;
 	static String numberOfGarageFileName = "numberOfGarage.txt";
 
 	private static final ConcurrentMap<Integer, ClientHandler> clientsByGarageId = new ConcurrentHashMap<>();
 	private final static Object fileLockHandler = new Object();
 	private static PGMSOwnerGUI ownerGUI;
-
+	public static double HOURLY_RATE = 1.00;     // default hourly rate
+	public static double DAILY_MAX_HOURS = 5;    // max chargeable hours per day
 	// Program Main Section
 	public static void main(String[] args) {
 
+	    ensureOperatorPasswordFileExists();
 		// Lazy Instantiation of ServerSocket
 		ServerSocket server = null;
 
@@ -80,8 +85,20 @@ public class PGMS {
 		}
 	}
 
+	private static void ensureOperatorPasswordFileExists() {
+	    File file = new File("username_pw.txt");
+	    if (!file.exists()) {
+	        try (FileWriter writer = new FileWriter(file)) {
+	            writer.write("user,password");
+	            System.out.println("Created default operator credentials: user,password");
+	        } catch (IOException e) {
+	            e.printStackTrace();
+	        }
+	    }
+	}		
+	
 	private static class ClientHandler implements Runnable {
-
+		
 		// Private Variables
 		private final Socket clientSocket;
 		private int garageID;
@@ -120,7 +137,7 @@ public class PGMS {
 
 						} else if (msgType == MsgTypes.GARAGELOGIN) { // If garage existed
 							garageID = inMsg.getGarageID();
-							// loadGarage(garageID); // get the garageID and load tickets for garage
+							loadGarage(garageID); // get the garageID and load tickets for garage
 						}
 						loggedIn = true; // Set this Garage to logged in
 
@@ -145,20 +162,39 @@ public class PGMS {
 							break;
 						}
 
-						// MsgType LOOKUPTICKET creates a new Ticket object from the client's request
-						// If ticket is found from the two dimensional array, send ticket 'reply' to
-						// client
 						case LOOKUPUNPAIDTICKET: {
 
-							Ticket ticket = lookUpUnpaidTicket(garageID, inMsg);
-							if (ticket != null) {
-								outMsg = new Message(MsgTypes.LOOKUPUNPAIDTICKET, garageID);
-								outMsg.setTicket(ticket);
-								out.writeObject(outMsg);
-								out.flush();
-							}
-							break;
+						    // Extract GUI ID
+						    Ticket requestTicket = inMsg.getTicket();
+						    int guiID = requestTicket.getGuiID();
+
+						    // Load unpaid ticket
+						    Ticket t = lookUpUnpaidTicket(garageID, inMsg);
+
+						    if (t == null) {
+						        System.out.println("LOOKUP: No unpaid tickets for garage " + garageID);
+						        Message emptyMsg = new Message(MsgTypes.LOOKUPUNPAIDTICKET, garageID);
+						        emptyMsg.setTicket(null);
+						        out.writeObject(emptyMsg);
+						        out.flush();
+						        break;
+						    }
+
+						    // Assign updated hourly rate and calculate fee
+						    t.setRate(PGMS.HOURLY_RATE);
+						    t.setExitTime(LocalDateTime.now());
+						    t.calculateFee();
+
+						    // Send ticket back to client GUI
+						    Message outMsg1 = new Message(MsgTypes.LOOKUPUNPAIDTICKET, garageID);
+						    t.setGuiID(guiID);
+						    outMsg1.setTicket(t);
+						    out.writeObject(outMsg1);
+						    out.flush();
+						    break;
 						}
+
+
 						case TICKETPAID: {
 							ticketIsPaid(inMsg);
 							break;
@@ -178,6 +214,17 @@ public class PGMS {
 							break;
 
 						}
+						
+						case SETRATE: {
+						    // Rate message coming from this garage's Operator GUI
+						    Ticket t = inMsg.getTicket();
+						    double newRate = t.getRate();
+						    PGMS.HOURLY_RATE = newRate;  // update global hourly rate
+						    System.out.println("PGMS: updated HOURLY_RATE to " + newRate +
+						                       " from garage " + garageID);
+						    break;
+						}						
+						
 						case GETREPORT: {
 							outMsg = new Message(MsgTypes.GETREPORT, garageID);
 							List<Ticket> reportTickets = getReportTickets();
@@ -237,7 +284,10 @@ public class PGMS {
 
 		// Function to Create a new Garage with a garage ID
 		private void createNewGarage(int garageID) throws IOException {
-
+			while (UNPAIDTICKETS.size() <= garageID)
+			    UNPAIDTICKETS.add(new ArrayList<>());
+			while (PAIDTICKETS.size() <= garageID)
+			    PAIDTICKETS.add(new ArrayList<>());
 			String fileNamePaid = "garage#" + Integer.toString(garageID) + "_paid.txt";
 			String fileNameUnpaid = "garage#" + Integer.toString(garageID) + "_unpaid.txt";
 
@@ -266,22 +316,45 @@ public class PGMS {
 
 		}
 
-		// Lookup Unpaid Ticket
+		private void handleSetRate(Message inMsg) throws IOException {
+		    double newRate = inMsg.getTicket().getRate();
+		    // Update server-side hourly rate
+		    PGMS.HOURLY_RATE = newRate;
+		    System.out.println("Server: Updated HOURLY_RATE to = " + newRate);
+		    // Send SETRATE update back to this client
+		    Message outMsg = new Message(MsgTypes.SETRATE, garageID);
+		    outMsg.setTicket(inMsg.getTicket());
+		    send(outMsg);
+		}		
+		
 		private Ticket lookUpUnpaidTicket(int garageID, Message inMsg) throws IOException {
 
-			List<Ticket> unPaidList = loadUnpaidTicket();
-			Ticket ticket = null; // Create a ticket object
-			if (unPaidList != null && !unPaidList.isEmpty()) {
-				Random random = new Random(); // Create a random object
-				int index = random.nextInt(unPaidList.size());
+		    List<Ticket> tickets = UNPAIDTICKETS.get(garageID);
 
-				ticket = unPaidList.get(index); // Grab random ticket to send to client
-				ticket.setGuiID(inMsg.getTicket().getGuiID());
-			}
+		    // return null safely if empty
+		    if (tickets == null || tickets.isEmpty()) {
+		        System.out.println("LOOKUP: No unpaid tickets found for garage " + garageID);
+		        return null;
+		    }
 
-			return ticket; // return random ticket to client
-		}
+		    // Choose a random unpaid ticket
+		    Random random = new Random();
+		    int index = random.nextInt(tickets.size());
+		    Ticket ticket = tickets.get(index);
 
+		    // Copy the ticket safely
+		    Ticket copy = new Ticket();
+		    copy.setGarageID(garageID);
+		    copy.setGuiID(inMsg.getTicket().getGuiID());
+		    copy.setLicensePlate(ticket.getLicensePlate());
+		    copy.setEntryTime(ticket.getEntryTime());
+
+		    // assign updated rate
+		    copy.setRate(PGMS.HOURLY_RATE);
+
+		    return copy;
+		}    
+		
 		private void ticketIsPaid(Message inMsg) throws IOException {
 
 			Ticket ticket = inMsg.getTicket();
@@ -320,6 +393,51 @@ public class PGMS {
 			}
 		}
 
+		private void loadGarage(int garageID) throws FileNotFoundException {
+		    // load existing ticket from file to UNPAIDTICKETS and PAIDTICKETS for garage
+
+		    // Format text file name
+		    String fileNamePaid = "garage#" + Integer.toString(garageID) + "_paid.txt";
+		    String fileNameUnpaid = "garage#" + Integer.toString(garageID) + "_unpaid.txt";
+
+		    List<Ticket> paidList = new ArrayList<Ticket>();
+		    List<Ticket> unPaidList = new ArrayList<Ticket>();
+
+		    // read ticket from file and add to list;
+		    File file = new File(fileNamePaid);
+		    synchronized (fileLockHandler) {
+		        try (Scanner scanner = new Scanner(file)) {
+		            while (scanner.hasNextLine()) {
+		                String line = scanner.nextLine().trim();
+		                Ticket ticket = new Ticket(line);
+		                paidList.add(ticket);
+		            }
+		        }
+		    }
+
+		    file = new File(fileNameUnpaid);
+		    synchronized (fileLockHandler) {
+		        try (Scanner scanner = new Scanner(file)) {
+		            while (scanner.hasNextLine()) {
+		                String line = scanner.nextLine().trim();
+		                Ticket ticket = new Ticket(line);
+		                unPaidList.add(ticket);
+		            }
+		        }
+		    }
+
+		    // set empty lists if needed
+		    while (UNPAIDTICKETS.size() <= garageID)
+		        UNPAIDTICKETS.add(null);
+		    while (PAIDTICKETS.size() <= garageID)
+		        PAIDTICKETS.add(null);
+
+		    // add the list of tickets to list
+		    UNPAIDTICKETS.set(garageID, unPaidList);
+		    PAIDTICKETS.set(garageID, paidList);
+		}
+		
+		
 		private List<Ticket> loadUnpaidTicket() {
 			String fileNameUnpaid = "garage#" + Integer.toString(garageID) + "_unpaid.txt";
 			List<Ticket> unPaidList = new ArrayList<Ticket>();
@@ -461,6 +579,7 @@ public class PGMS {
 
 	// ============ PGMS OwnerGUI callback functions ===================
 	public static boolean getSetRateCallback(int garageID, double rate) {
+		PGMS.HOURLY_RATE = rate; // applies hourly rate to all garages
 		try {
 			ClientHandler handler = clientsByGarageId.get(garageID);
 			if (handler == null) {

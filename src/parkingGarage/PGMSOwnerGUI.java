@@ -11,7 +11,13 @@ import java.awt.Insets;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.util.Scanner;
-
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.util.Scanner;
+import javax.swing.*;
+import java.awt.*;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -26,6 +32,7 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.SwingUtilities;
 
+
 public class PGMSOwnerGUI implements Runnable {
 
 	// private boolean isConnected = false;
@@ -37,7 +44,8 @@ public class PGMSOwnerGUI implements Runnable {
 	PGMSOwnerGUISetRateCB setRateCallback;
 	GUISearchTicketCB GUISearchTicketCallback;
 	GUIgetReportCB ownerGetReportCallback;
-	GUIgetReportByMonthYearCB ownerGetReportByMonthYearCallback;
+	private GUIgetReportByMonthYearCB ownerGetReportByMonthYearCallback;
+	
 	// GUI components
 	private JFrame mainFrame;
 	private JPanel loginPanel;
@@ -55,27 +63,31 @@ public class PGMSOwnerGUI implements Runnable {
 	private JButton saveReportButton;
 	private JButton searchButton;
 	private JButton loadReportButton;
-	private JButton getReportByMonthYearButton;
 	private JTextField searchReportFilenameField;
 	private JTextField garageNumSearchField;
 	private JTextField searchField;
 	private JTextField filenameField;
 	private JTextField monthField;
-	private JTextField yearField;
 
 	private JTextArea displayArea;
 	private JButton setRateButton;
 	private JTextField inputRateField;
 	private JTextField inputRateForGarage;
 
-	public PGMSOwnerGUI(int totalGarages, PGMSOwnerGUISetRateCB setRateCallback,
-			GUISearchTicketCB GUISearchTicketCallback, GUIgetReportCB ownerGetReportCallback,
-			GUIgetReportByMonthYearCB ownerGetReportByMonthYearCallback) {
-		this.totalGarages = totalGarages;
-		this.setRateCallback = setRateCallback;
-		this.GUISearchTicketCallback = GUISearchTicketCallback;
-		this.ownerGetReportCallback = ownerGetReportCallback;
-		this.ownerGetReportByMonthYearCallback = ownerGetReportByMonthYearCallback;
+
+	private JTextField yearField;
+	private JButton getReportByMonthYearButton;
+
+	public PGMSOwnerGUI(int totalGarages,
+		    PGMSOwnerGUISetRateCB setRateCallback,
+		    GUISearchTicketCB GUISearchTicketCallback,
+		    GUIgetReportCB ownerGetReportCallback,
+		    GUIgetReportByMonthYearCB ownerGetReportByMonthYearCallback) {
+				this.totalGarages = totalGarages;
+				this.setRateCallback = setRateCallback;
+				this.GUISearchTicketCallback = GUISearchTicketCallback;
+				this.ownerGetReportCallback = ownerGetReportCallback;
+				this.ownerGetReportByMonthYearCallback = ownerGetReportByMonthYearCallback;
 	}
 
 	@Override
@@ -83,6 +95,19 @@ public class PGMSOwnerGUI implements Runnable {
 		SwingUtilities.invokeLater(this::createWindow);
 
 	}
+	
+	private void ensureOwnerPasswordFileExists() {
+		File file = new File(ownerPwFileName);
+		if (!file.exists()) {
+			try (FileWriter writer = new FileWriter(file)) {
+				writer.write("user, password");  // default username and password
+				System.out.println("Created default owner_pw.txt with credentials: user, password");
+			}
+			catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}	
 
 	// Creates and displays the main GUI window
 	private void createWindow() {
@@ -229,7 +254,7 @@ public class PGMSOwnerGUI implements Runnable {
 
 		// Set rate panel
 		JPanel setRatePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-		setRatePanel.add(new JLabel("Enter New Rate Per Seconds: "));
+		setRatePanel.add(new JLabel("Enter New Rate Per Hour: "));
 		inputRateField = new JTextField(8);
 		inputRateField.setFont(new Font("Arial", Font.PLAIN, 14));
 		setRatePanel.add(inputRateField);
@@ -262,28 +287,79 @@ public class PGMSOwnerGUI implements Runnable {
 		displayArea.setBorder(BorderFactory.createLineBorder(Color.GRAY));
 		JScrollPane scrollPane = new JScrollPane(displayArea);
 		dashboardPanel.add(scrollPane, BorderLayout.CENTER);
-	}
+		
+		// Get Report By Month/Year panel
+				JPanel getReportByMonthYearPanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
+				getReportByMonthYearPanel.add(new JLabel("Garage #: "));
+				JTextField garageNumMonthYearField = new JTextField(5);
+				garageNumMonthYearField.setFont(new Font("Arial", Font.PLAIN, 14));
+				getReportByMonthYearPanel.add(garageNumMonthYearField);
+				getReportByMonthYearPanel.add(new JLabel("Month (1-12): "));
+				monthField = new JTextField(5);
+				monthField.setFont(new Font("Arial", Font.PLAIN, 14));
+				getReportByMonthYearPanel.add(monthField);
+				getReportByMonthYearPanel.add(new JLabel("Year (e.g., 2025): "));
+				yearField = new JTextField(6);
+				yearField.setFont(new Font("Arial", Font.PLAIN, 14));
+				getReportByMonthYearPanel.add(yearField);
+				getReportByMonthYearButton = new JButton("Get Report (Month/Year)");
+				getReportByMonthYearButton.setFont(new Font("Arial", Font.BOLD, 14));
+				getReportByMonthYearButton.addActionListener(e -> {
+				    String garageText = garageNumMonthYearField.getText().trim();
+				    String monthText = monthField.getText().trim();
+				    String yearText = yearField.getText().trim();
+				    if (garageText.isEmpty() || monthText.isEmpty() || yearText.isEmpty()) {
+				        JOptionPane.showMessageDialog(null, 
+				            "Please enter garage #, month, and year", 
+				            "Missing Input", 
+				            JOptionPane.WARNING_MESSAGE);
+				        return;
+				    }
+				    try {
+				        int garageID = Integer.parseInt(garageText);
+				        int month = Integer.parseInt(monthText);
+				        int year = Integer.parseInt(yearText);
+				        Report report = ownerGetReportByMonthYearCallback.run(garageID, month, year);
+				        displayReport(report);
+				    } catch (NumberFormatException ex) {
+				        JOptionPane.showMessageDialog(null, 
+				            "Month, Year, and Garage must be numbers.", 
+				            "Invalid Input", 
+				            JOptionPane.WARNING_MESSAGE);
+				    }
+				});
+				getReportByMonthYearPanel.add(getReportByMonthYearButton);
+				controlPanel.add(getReportByMonthYearPanel);
+			}
 
 	private void login() {
+		// make file for user/password before reading 
+		ensureOwnerPasswordFileExists();
+		// Declare 'file'before using it
+		File file = new File(ownerPwFileName);
+		// show where the file is being searched for (troubleshooting) 
+		System.out.println("Working directory: " + new File(".").getAbsolutePath());
+		System.out.println("Looking for owner_pw.txt at: " + file.getAbsolutePath());
 		// get Owner log in username/pw from GUI
 		String username = usernameField.getText().trim();
 		String pw = new String(passwordField.getPassword());
 		statusLabel.setText("");
-		File file = new File(ownerPwFileName);
 		try (Scanner scanner = new Scanner(file)) {
 			while (scanner.hasNextLine()) {
 				String line = scanner.nextLine().trim();
 				String[] parts = line.split(",");
-				if (username.equals(parts[0]) && pw.equals(parts[1])) {
+				String fileUser = parts[0].trim();	// make sure no whitespace
+				String filePw = parts[1].trim();
+				if (username.equals(fileUser) && pw.equals(filePw)) {
 					loggedInSuccess();
 				}
 			}
 			loggedInFail();
-		} catch (FileNotFoundException e) {
+		}
+		catch (FileNotFoundException e) {
 			e.printStackTrace();
 		}
-//		loggedInSuccess();
-
+		//		loggedInSuccess();
 	}
 
 	// logout owner

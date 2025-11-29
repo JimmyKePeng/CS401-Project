@@ -27,6 +27,15 @@ public class Gate implements Runnable {
 		this.garageID = garageID;
 	}
 
+	private double rate = 2.0;   // default hourly rate
+	public double getRate() {
+	    return rate;
+	}
+
+	public void setRate(double newRate) {
+	    this.rate = newRate;
+	}	
+	
 	public int getGarageID() {
 		return garageID;
 	}

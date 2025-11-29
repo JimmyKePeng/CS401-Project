@@ -8,7 +8,9 @@ import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
-
+import java.io.File;
+import java.io.FileWriter;
+import java.io.IOException;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -83,8 +85,26 @@ public class OperatorGUI implements Runnable {
 
 	}
 
+	public static boolean operatorSetRateCallback(double rate) {
+	    PGMS.HOURLY_RATE = rate;
+	    return true;
+	}
+
+	private void ensureOperatorPasswordFileExists() {
+	    File file = new File("username_pw.txt");
+	    if (!file.exists()) {
+	        try (FileWriter writer = new FileWriter(file)) {
+	            writer.write("user,password");
+	            System.out.println("Created default username_pw.txt with credentials: user,password");
+	        } catch (IOException e) {
+	            e.printStackTrace();
+	        }
+	    }
+	}	
+	
 	// Creates and displays the main GUI window
 	private void createWindow() {
+		ensureOperatorPasswordFileExists();
 		mainFrame = new JFrame("Parking Garage " + garageID + " Operator GUI");
 		mainFrame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 		mainFrame.setSize(1200, 600);
@@ -221,7 +241,7 @@ public class OperatorGUI implements Runnable {
 
 		// Set rate panel
 		JPanel setRatePanel = new JPanel(new FlowLayout(FlowLayout.LEFT));
-		setRatePanel.add(new JLabel("Enter New Rate Per Second: "));
+		setRatePanel.add(new JLabel("Enter New Rate Per Hour: "));
 		inputRateField = new JTextField(15);
 		inputRateField.setFont(new Font("Arial", Font.PLAIN, 14));
 		setRatePanel.add(inputRateField);

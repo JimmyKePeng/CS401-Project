@@ -39,7 +39,8 @@ public class DriverGUI implements Runnable {
 	private JButton leaveButton;
 	private JLabel durationLabel, plateLabel, feeLabel, welcomeText, question;
 	private JButton payButton;
-
+	private double rate = 2.0;
+	
 	// Currently Unused
 	// private LicensePlateReader LPR;
 	// private JFrame frame;
@@ -132,7 +133,8 @@ public class DriverGUI implements Runnable {
 		panel.add(Box.createRigidArea(new Dimension(0, 30)));
 
 		panel.add(payButton);
-
+	
+		
 		frame.add(panel);
 		// ===END OF ORGANIZATION OF BUTTONS AND LABELS IN PANEL
 
@@ -142,8 +144,8 @@ public class DriverGUI implements Runnable {
 
 		leaveButton.addActionListener((ActionEvent e) -> {
 			getUnpaidCallback.run(GuiID); // triggers client to send GET_UNPAID
-		});
-
+		});	
+		
 		// result.add(durationLabel);
 		// result.add(plateLabel);
 		// result.add(feeLabel);
@@ -151,6 +153,12 @@ public class DriverGUI implements Runnable {
 		// frame.getContentPane().add(panel, BorderLayout.NORTH);
 		// frame.getContentPane().add(new JScrollPane(logArea), BorderLayout.CENTER);
 	}
+	
+	public void updateRate(double newRate) {
+	    this.rate = newRate;
+	    System.out.println("Updated rate for GUI " + GuiID + ": " + rate);
+	}
+	
 
 	
 	/* ASYNCH FUNCTION
@@ -158,25 +166,31 @@ public class DriverGUI implements Runnable {
 	 * Pulls info from ticket, set that information onto labels & buttons if it exists. 
 	 */
 	public void showUnpaidTicket(Ticket t) {
+
 		SwingUtilities.invokeLater(() -> {
 			this.ticket = t;
+	        if (t == null) {
+	            durationLabel.setText("None");
+	            plateLabel.setText("-");
+	            feeLabel.setText("-");
+	            payButton.setEnabled(false);
+	            return;
+	        }
+				// appendLine("No unpaid ticket found.");	
+	        t.setExitTime(java.time.LocalDateTime.now());
+	        t.calculateFee(); 
 
-			if (t == null) {
-				durationLabel.setText("None");
-				plateLabel.setText("-");
-				feeLabel.setText("-");
-				// appendLine("No unpaid ticket found.");
-
-			} else {
-				durationLabel.setText(String.valueOf(t.getDurationOfStay().getSeconds()) + " seconds");
-				plateLabel.setText(t.getLicensePlate());
-				feeLabel.setText(String.format("$%.2f", t.getFee()));
-				// appendLine("Received unpaid ticket: " + t);
-				payButton.setEnabled(true);
-			}
-
-		});
-	}
+		        if (t.getDurationOfStay() != null) {
+		        	long hours = (long) Math.ceil(t.getDurationOfStay().getSeconds() / 3600.0);
+		        	durationLabel.setText(hours + " hours");
+		        } else {
+		            durationLabel.setText("0 hours");  // fallback (should not happen)
+		        }
+		        plateLabel.setText(t.getLicensePlate());
+		        feeLabel.setText(String.format("$%.2f", t.getFee()));
+		        payButton.setEnabled(true);
+		    });
+		}
 
 	
 	//Allows the payment processor to use a Credit Card object to determine if payment is authorized

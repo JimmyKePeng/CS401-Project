@@ -34,30 +34,44 @@ public class Ticket implements Serializable {
 
 	// Parameterized Constructor using licensePlate and garageID (Programmer
 	// Defined)
-	public Ticket(String licensePlate, int garageID) {
-		this.licensePlate = licensePlate;
-		this.entryTime = LocalDateTime.now();
-		this.paid = false;
-		this.garageID = garageID;
-		this.fee = 0;
-		this.exitTime = null;
-		this.durationOfStay = null;
-		this.rate = 0;
+
+	public Ticket(String licensePlate, int garageID, double rate) {
+	    this.licensePlate = licensePlate;
+	    this.entryTime = LocalDateTime.now();
+	    this.paid = false;
+	    this.garageID = garageID;
+	    this.fee = 0;
+	    this.exitTime = null;
+	    this.durationOfStay = null;
+	    this.rate = rate;   // store hourly rate
 	}
 
 	// Parameterized Constructor using string from file read
+
 	public Ticket(String stringFromTxtFile) {
-		String[] parts = stringFromTxtFile.split(",", -1);
+    String[] parts = stringFromTxtFile.split(",", -1);
+    garageID = Integer.parseInt(parts[0].trim());
+    licensePlate = parts[1].trim();
+    fee = Double.parseDouble(parts[2].trim());
+    paid = Boolean.parseBoolean(parts[3].trim());
+    this.entryTime = parseDate(parts[4]);
+    this.exitTime = parseDate(parts[5]);
+    this.durationOfStay = parseDuration(parts[6]);
 
-		garageID = Integer.parseInt(parts[0].trim());
-		licensePlate = parts[1].trim();
-		fee = Double.parseDouble(parts[2].trim());
-		paid = Boolean.parseBoolean(parts[3].trim());
-		this.entryTime = parseDate(parts[4]);
-		this.exitTime = parseDate(parts[5]);
-		this.durationOfStay = parseDuration(parts[6]);
+    // =========================
+    //  HANDLE MISSING RATE
+    // =========================
 
-	}
+    if (parts.length >= 8) {
+        try {
+            this.rate = Double.parseDouble(parts[7].trim());
+        } catch (Exception e) {
+            this.rate = 2.0; // fallback if corrupted
+        }
+    } else {
+        this.rate = 2.0;    // default hourly rate
+    }
+}
 
 	// Function to set exit time
 	private void setExitTime() {
@@ -66,11 +80,29 @@ public class Ticket implements Serializable {
 	}
 
 	// Function to calculate fee, rate passed in by the client
-	public void calculateFee(double ratePerS) {
-		this.rate = ratePerS;
-		setExitTime();
-		int s = (int) durationOfStay.getSeconds();
-		fee = s * ratePerS;
+	public void calculateFee() {
+	    if (entryTime == null || exitTime == null) {
+	        fee = 0;
+	        durationOfStay = Duration.ZERO;
+	        return;
+	    }
+	    // Compute duration FIRST
+	    durationOfStay = Duration.between(entryTime, exitTime);
+	    long totalSeconds = durationOfStay.getSeconds();
+	    if (totalSeconds < 0) totalSeconds = 0;
+	    // Convert to hours (round UP even partial hours)
+	    long totalHours = (long) Math.ceil(totalSeconds / 3600.0);
+	    double hourlyRate = this.rate;  // your rate per hour
+	    double maxPerDay = hourlyRate * 5; // 5 hour daily cap
+	    // Compute whole days
+	    long days = totalHours / 24;
+	    long leftoverHours = totalHours % 24;
+	    // Fee from full days
+	    double totalFee = days * maxPerDay;
+	    // Fee from leftover hours (capped at 5 hours)
+	    long billableHours = Math.min(leftoverHours, 5);
+	    totalFee += billableHours * hourlyRate;
+	    this.fee = totalFee;
 	}
 
 	public double getRate() {
@@ -158,8 +190,9 @@ public class Ticket implements Serializable {
 
 	@Override
 	public String toString() {
-		return garageID + "," + licensePlate + "," + fee + "," + paid + "," + isNull(entryTime) + "," + isNull(exitTime)
-				+ "," + isNull(durationOfStay) + "\n";
+		return garageID + "," + licensePlate + "," + fee + "," + paid + "," +
+			       isNull(entryTime) + "," + isNull(exitTime) + "," +
+			       isNull(durationOfStay) + "," + rate + "\n";
 	}
 
 	private LocalDateTime parseDate(String s) {

@@ -110,6 +110,9 @@ public class ParkingGarageClient {
 			// SUCCESS or otherwise
 			final int garageID = assignedID;
 			final boolean running = loggedIn;
+			
+			// create gate object here
+			Gate gate = new Gate(garageID, Location.Entry);
 			// double ratePerSecond = initialRate;
 			// ========LISTENING FOR LICENSE PLATE READER FOR LICENSE PLATE===========
 			Thread sender = new Thread(() -> { // Thread 'sender' is made, runs while logged in
@@ -117,11 +120,11 @@ public class ParkingGarageClient {
 					while (running) {
 						String plate = queue.take(); // Queue will wait (block) until there is a license plate in the
 														// queue
-						Ticket ticket = new Ticket(plate, garageID); // A new ticket object is made with the plate taken
-																		// from the queue
+						double rate = gate.getRate();
+						Ticket t = new Ticket(plate, garageID, rate); // A new ticket object is made with the plate taken
 						Message Msg = new Message(MsgTypes.NEWTICKET, garageID); // A message object is made with the
 																					// type NEWTICKET and garage ID
-						Msg.setTicket(ticket); // Ticket object is set to the message
+						Msg.setTicket(t); // Ticket object is set to the message
 						out.writeObject(Msg); // Message object is sent to the server
 						out.flush(); // flush stream
 					}
@@ -150,7 +153,7 @@ public class ParkingGarageClient {
 
 							// System.out.println("Looking up tickets in GUI# " + id);
 
-							t.calculateFee(ratePerSecond); // Calculate ticket fee amount, stored in Ticket
+							t.calculateFee(); // Calculate ticket fee amount, stored in Ticket
 							DriverGUI targetGUI = guiById.get(id); // Creates a DriverGUI object, initialized by
 																	// receiving the GUI object from associated ID Map
 							targetGUI.showUnpaidTicket(t); // GUI will show the unpaid Ticket
@@ -277,7 +280,7 @@ public class ParkingGarageClient {
 			GUISearchTicketCB operatorGUISearchTicketCallback = (String licensePlate) -> {
 				try {
 					Message msg = new Message(MsgTypes.SEARCHTICKET, garageID);
-					Ticket ticket = new Ticket(licensePlate, garageID);
+					Ticket ticket = new Ticket(licensePlate, garageID, 0.0);
 					// set entry time to null to show this ticket is not a regular ticket
 					ticket.setEntryTime(null);
 					msg.setTicket(ticket);
@@ -290,12 +293,24 @@ public class ParkingGarageClient {
 			};
 
 			OperatorGUISetRateCB operatorGUISetRateCallback = (double rate) -> {
-				ratePerSecond = rate;
-				try (FileWriter writer = new FileWriter(garageRateFileName)) { // Opens file
-					writer.write(String.valueOf(rate));// Writes to assignedID to file
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
+			    try {
+			        // Send new rate to the server so it can update PGMS.HOURLY_RATE
+			        Message msg = new Message(MsgTypes.SETRATE, garageID);
+			        Ticket rateTicket = new Ticket(garageID, rate);  // uses (int garageID, double rate) constructor
+			        msg.setTicket(rateTicket);
+			        out.writeObject(msg);
+			        out.flush();
+
+			        // Also save locally so this garage remembers rate across restarts
+			        ratePerSecond = rate;
+			        try (FileWriter writer = new FileWriter(garageRateFileName)) {
+			            writer.write(String.valueOf(rate));
+			        }
+
+			        System.out.println("Operator set new hourly rate: " + rate);
+			    } catch (IOException e) {
+			        e.printStackTrace();
+			    }
 			};
 
 			GUIgetReportByMonthYearCB getReportByMonthYearCallback = (int OptionalgarageID, int month, int year) -> {
@@ -333,11 +348,19 @@ public class ParkingGarageClient {
 	}
 
 	private static void setRate(Message msg) {
-		ratePerSecond = msg.getTicket().getRate();
-		try (FileWriter writer = new FileWriter(garageRateFileName)) { // Opens file
-			writer.write(String.valueOf(ratePerSecond));// Writes to assignedID to file
-		} catch (IOException e) {
-			e.printStackTrace();
-		}
+	    double newRate = msg.getTicket().getRate();
+	    ratePerSecond = newRate;   // update client rate
+
+	    System.out.println("New hourly rate received from server: " + newRate);
+
+	    // Update gate for ALL driver GUIs so new tickets use new rate
+	    if (driverGUI1 != null) driverGUI1.updateRate(newRate);
+	    if (driverGUI2 != null) driverGUI2.updateRate(newRate);
+
+	    try (FileWriter writer = new FileWriter(garageRateFileName)) {
+	        writer.write(String.valueOf(newRate));
+	    } catch (IOException e) {
+	        e.printStackTrace();
+	    }
 	}
 }
