@@ -1,9 +1,13 @@
 package parkingGarage;
 
+import java.io.File;
+import java.io.FileNotFoundException;
 import java.io.Serializable;
 import java.time.Duration;
 import java.time.LocalDate;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.Scanner;
 
 public class Report implements Serializable {
 
@@ -14,16 +18,25 @@ public class Report implements Serializable {
 	private LocalDate creationDate;
 	private List<Ticket> tickets;
 
+	// Private variables used to search report with filters only,
+	// the rest of the time is -1;
+	private int month;
+	private int year;
+
 	// Default Constructor
 	public Report() {
+		this.month = -1;
+		this.year = -1;
 		this.garageID = 0;
 		this.avgStayTime = 0;
 		this.totalFee = 0;
 		this.creationDate = LocalDate.now();
 	}
 
-	// Parameterized Constructor
+	// Parameterized Constructor, create report with given garageID and Ticket list
 	public Report(int garageID, List<Ticket> tickets) {
+		this.month = -1;
+		this.year = -1;
 		this.garageID = garageID;
 		this.tickets = tickets; // PAIDTICKETS
 		this.creationDate = LocalDate.now();
@@ -31,6 +44,47 @@ public class Report implements Serializable {
 		this.totalFee = 0;
 		calculateAvgStayTime();
 		calculateTotalFee();
+	}
+
+	// use this constructor to load report from txt file
+	public Report(String fileName) {
+		File file = new File(fileName);
+
+		if (file.exists()) {
+			try (Scanner scanner = new Scanner(file)) {
+				// Parse header line, first line on the txt file will contain
+				// garageID,avgStayTime,totalFee, creationDate because we used the toString
+				// method to write to txt file, we are doing the reverse now
+				String header = scanner.nextLine().trim();
+				String[] parts = header.split(",");
+
+				this.garageID = Integer.parseInt(parts[0]);
+				this.avgStayTime = Integer.parseInt(parts[1]);
+				this.totalFee = Double.parseDouble(parts[2]);
+				this.creationDate = LocalDate.parse(parts[3]);
+
+				// Parse ticket lines
+				this.tickets = new ArrayList<>();
+				while (scanner.hasNextLine()) {
+					String line = scanner.nextLine().trim();
+					if (line.isEmpty())
+						continue;
+					Ticket t = new Ticket(line);
+					tickets.add(t);
+				}
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+			}
+		} else {
+			// if no report file is found, set everything to -1. so we know this is a null
+			// report
+			this.garageID = -1;
+			this.avgStayTime = -1;
+			this.totalFee = -1;
+			this.creationDate = null;
+		}
+		this.month = -1;
+		this.year = -1;
 	}
 
 	// Function to calculate average stay time
@@ -44,8 +98,9 @@ public class Report implements Serializable {
 			// Add amount of every ticket duration of stay into 'duration'
 			duration = duration.plus(t.getDurationOfStay());
 		}
-		avgStayTime = (int) duration.getSeconds() / 60 / tickets.size(); // Seconds divided by 60 divided by
-																			// PAIDTICKETS
+
+		// get the avg stay time
+		avgStayTime = (int) duration.getSeconds() / tickets.size();
 
 	}
 
@@ -56,6 +111,9 @@ public class Report implements Serializable {
 		for (Ticket t : tickets) {
 			totalFee += t.getFee();
 		}
+
+		// round it to two decimal
+		totalFee = Math.round(totalFee * 100.0) / 100.0;
 	}
 
 	public int getGarageId() {
@@ -64,6 +122,22 @@ public class Report implements Serializable {
 
 	public int getAvgStayTIme() {
 		return avgStayTime;
+	}
+
+	public int getMonth() {
+		return month;
+	}
+
+	public int getYear() {
+		return year;
+	}
+
+	public void setMonth(int month) {
+		this.month = month;
+	}
+
+	public void setYear(int year) {
+		this.year = year;
 	}
 
 	public double getTotalFee() {
@@ -78,27 +152,8 @@ public class Report implements Serializable {
 		return tickets;
 	}
 
-	public String getReportInfo() {
-		StringBuilder sb = new StringBuilder();
-		sb.append(garageID).append(",").append(avgStayTime).append(",").append(totalFee).append(",")
-				.append(creationDate).append("\n");
-		return sb.toString();
-	}
-
-	public String getTicketStrings() {
-		StringBuilder sb = new StringBuilder();
-		// Append all tickets, one per line
-		for (Ticket t : tickets) {
-			sb.append(t.toString());
-		}
-
-		return sb.toString();
-	}
-
 	@Override
 	public String toString() {
-		// Example line in txt file: 1,45,123.75,2025-11-01
-
 		// StringBuilder object to append all parts of this report into a string
 		StringBuilder sb = new StringBuilder();
 		sb.append(garageID).append(",").append(avgStayTime).append(",").append(totalFee).append(",")
@@ -112,4 +167,25 @@ public class Report implements Serializable {
 		return sb.toString();
 
 	}
+
+	/// ================== UN-USED methods ==================
+	// return a string contain the basic information for the report
+	public String getReportInfo() {
+		StringBuilder sb = new StringBuilder();
+		sb.append(garageID).append(",").append(avgStayTime).append(",").append(totalFee).append(",")
+				.append(creationDate).append("\n");
+		return sb.toString();
+	}
+
+	// turn all the tickets in the report to a string
+	public String getTicketStrings() {
+		StringBuilder sb = new StringBuilder();
+		// Append all tickets, one per line
+		for (Ticket t : tickets) {
+			sb.append(t.toString());
+		}
+
+		return sb.toString();
+	}
+
 }

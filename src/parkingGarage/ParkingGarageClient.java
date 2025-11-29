@@ -96,10 +96,10 @@ public class ParkingGarageClient {
 				if (!loggedIn && inMsg.getMsgType() == MsgTypes.SUCCESS) {
 					loggedIn = true;
 					assignedID = inMsg.getGarageID();
-					try (FileWriter writer = new FileWriter(garageIDFileName, true)) { // Opens file
+					try (FileWriter writer = new FileWriter(garageIDFileName)) { // Opens file
 						writer.write(String.valueOf(assignedID));// Writes to assignedID to file
 					}
-					try (FileWriter writer = new FileWriter(garageRateFileName, true)) { // Opens file
+					try (FileWriter writer = new FileWriter(garageRateFileName)) { // Opens file
 						writer.write(String.valueOf(ratePerSecond));// Writes to assignedID to file
 					}
 				}
@@ -148,7 +148,7 @@ public class ParkingGarageClient {
 							Ticket t = msg.getTicket(); // Pull ticket variable from received ticket into variable
 							int id = t.getGuiID(); // Pull GUI ID from Ticket
 
-							System.out.println("Looking up tickets in GUI# " + id);
+							// System.out.println("Looking up tickets in GUI# " + id);
 
 							t.calculateFee(ratePerSecond); // Calculate ticket fee amount, stored in Ticket
 							DriverGUI targetGUI = guiById.get(id); // Creates a DriverGUI object, initialized by
@@ -170,7 +170,7 @@ public class ParkingGarageClient {
 							operatorGUI.loggedInFail();
 							break;
 						}
-						case GETREPORT: {
+						case GETREPORT, GETREPORTBYMONTHYEAR: {
 							operatorGUI.displayReport(msg.getOperator().getReport());
 							break;
 						}
@@ -233,7 +233,8 @@ public class ParkingGarageClient {
 					e.printStackTrace();
 				}
 			};
-			// === DEFINE THE CALLBACK FUNCTION AND PASS TO THE GUI ===
+			// ==== DEFINE THE CALLBACK FUNCTION AND PASS TO THE GUI ======
+			// ====so the GUI can tell ParkingGarage to do certain task ===
 			// Create a GUI with this Garage ID and the
 			driverGUI1 = new DriverGUI(garageID, getUnpaidCallback, paidTicketCallback);
 			new Thread(driverGUI1).start(); // Runs the first driver GUI in a thread
@@ -297,11 +298,29 @@ public class ParkingGarageClient {
 					e.printStackTrace();
 				}
 			};
+
+			GUIgetReportByMonthYearCB getReportByMonthYearCallback = (int OptionalgarageID, int month, int year) -> {
+				try {
+					Message msg = new Message(MsgTypes.GETREPORTBYMONTHYEAR, garageID);
+					Operator operator = new Operator();
+					Report report = new Report();
+					report.setMonth(month);
+					report.setYear(year);
+					operator.setReport(report);
+					msg.setOperator(operator);
+					out.writeObject(msg);
+					out.flush();
+				} catch (Exception e) {
+					e.printStackTrace();
+
+				}
+				return null;
+			};
 			// === DEFINE THE CALLBACK FUNCTION AND PASS TO THE Operator GUI ===
 
 			// =========== Create/start Operator GUI ==================
 			operatorGUI = new OperatorGUI(garageID, operatorLoginCallback, operatorGetReportCallback,
-					operatorGUISearchTicketCallback, operatorGUISetRateCallback);
+					operatorGUISearchTicketCallback, operatorGUISetRateCallback, getReportByMonthYearCallback);
 			new Thread(operatorGUI).start();
 
 		} catch (

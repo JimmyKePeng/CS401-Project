@@ -3,26 +3,26 @@ package parkingGarage;
 import java.util.Random;
 import java.util.concurrent.BlockingQueue;
 
-public class LicensePlateReader implements Runnable { //(LPR)
-	
-	//Private Variables
+public class LicensePlateReader implements Runnable { // (LPR)
+
+	// Private Variables
 	private static int count = 0;
 	private int id;
 	private Random random = new Random();
 	private boolean running = true;
-	private Location LPRLocation; //Entrance or Exit
+	private Location LPRLocation; // Entrance or Exit
 	private int garageID;
 	private Gate gate;
 	private BlockingQueue<String> sharedQueue;
 
-	//Default Constructor
+	// Default Constructor
 	public LicensePlateReader() {
 		this.id = count++;
 		this.LPRLocation = Location.Exit;
 		this.gate = new Gate();
 	}
 
-	//Parameterized Constructor
+	// Parameterized Constructor
 	public LicensePlateReader(int garageID, Location location, BlockingQueue<String> sharedQueue) {
 		this.id = count++;
 		this.LPRLocation = location;
@@ -45,25 +45,29 @@ public class LicensePlateReader implements Runnable { //(LPR)
 
 		while (running) {
 			try {
-				Thread.sleep(5000); 					//Pretend Cars come in every 5seconds
-				if (LPRLocation == Location.Entry) { 	//Ensure this is an Entrance License Plate Reader
-					plate = randomPlate();				//Generate randomized String for license plate
-					System.out.println(plate);			//Show License Plate
-					sharedQueue.put(plate);				//Place into thread safe Queue to allow creation of new Ticket
-					new Thread(gate).start(); 			//Open the gate and auto close
+				Thread.sleep(5000); // Pretend Cars come in every 5seconds
+				if (LPRLocation == Location.Entry) { // Ensure this is an Entrance License Plate Reader
+					plate = randomPlate(); // Generate randomized String for license plate
+
+					// Place into thread safe Queue to allow creation of new Ticket.
+					// ParkingGarage will send a Message contain this plate number Ticket to Server
+					// and store it.
+					sharedQueue.put(plate);
+
+					new Thread(gate).start(); // Open the gate and it will auto close
 					while (!gate.isGateOpen()) {
-						Thread.sleep(2000); 	// sleep 2 second, so gate can set up sensors
+						Thread.sleep(2000); // sleep 2 second, so gate can set up sensors
 					}
 					while (gate.isGateOpen()) { // while the gate is open.
-						Thread.sleep(3000); 	// do nothing, keep sleeping
+						Thread.sleep(3000); // do nothing, and check it again in 3 seconds
 					}
 					// gate will be close at this point, that means car entered;
 					// start the loop again to pretend car comes in;
 
 				} else if (LPRLocation == Location.Exit) { // Exit License Plate Reader
-					// need to find a way to randomly select a unpaid ticket to pay.
-					// or find random ticket
-
+					// Since we do not have a real License Plate Reader, we will skip this for now
+					// if we have one, we will have to create a callback function to connect with
+					// server to load the unpaid ticket.
 				}
 			} catch (Exception e) {
 				stop();

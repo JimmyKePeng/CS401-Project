@@ -3,13 +3,13 @@ package parkingGarage;
 import java.util.Random;
 
 public class GateSensor implements Runnable {
-	
-	//Private Variables
+
+	// Private Variables
 	private boolean running;
 	private boolean carDetected;
 	private boolean carExited;
 
-	//Default Constructor
+	// Default Constructor
 	public GateSensor() {
 		running = true;
 		carDetected = false;
@@ -18,7 +18,7 @@ public class GateSensor implements Runnable {
 
 	@Override
 	public void run() {
-		reset(); //Resets state of sensors
+		reset(); // Resets state of sensors
 		Random random = new Random();
 		int randomNumber;
 		while (running) {
@@ -27,16 +27,17 @@ public class GateSensor implements Runnable {
 			} catch (InterruptedException e) {
 				e.printStackTrace();
 			}
-			
-			//If no car has been detected in the sensors, do the following
+
+			// If no car has been detected in the sensors, do the following
 			if (!carDetected) {
 				randomNumber = random.nextInt(6);
 				if (randomNumber % 3 == 0) { // pretend the car is in the lane now
 					carDetected = true;
 				}
 			}
-			//If the car has passed, or is on the sensor, do the following
-			else { 
+
+			// If the car has detected by the sensor, or is on the sensor, do the following
+			else {
 				randomNumber = random.nextInt(6);
 				if (randomNumber % 3 == 0) { // pretend the car left the lane
 					carDetected = false;

@@ -3,6 +3,8 @@ package parkingGarage;
 import java.io.Serializable;
 
 public class Operator implements Serializable {
+
+	// Operator contain Report that will be send over the network
 	private String username;
 	private String password;
 	private Report report;

@@ -9,6 +9,7 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.LayoutManager;
 import java.awt.event.ActionEvent;
+import java.time.Duration;
 
 //javax.swing
 import javax.swing.Box;
@@ -33,6 +34,8 @@ public class DriverGUI implements Runnable {
 	private int garageID;
 	private int GuiID;
 	private Ticket ticket;
+
+	// two callback functions from ParkingGarage
 	private DriverGUIgetUnpaidTicketCB getUnpaidCallback;
 	private DriverGUIpaidTicketCB paidTicketCallback;
 
@@ -40,18 +43,11 @@ public class DriverGUI implements Runnable {
 	private JLabel durationLabel, plateLabel, feeLabel, welcomeText, question;
 	private JButton payButton;
 
-	// Currently Unused
-	// private LicensePlateReader LPR;
-	// private JFrame frame;
-	// this is used to store license plate from exit license plate reader
-	// BlockingQueue<String> queue = new LinkedBlockingQueue<String>();
-
 	public DriverGUI(int garageID, DriverGUIgetUnpaidTicketCB getUnpaidCallback,
 			DriverGUIpaidTicketCB paidTicketCallback) {
 		this.gate = new Gate(garageID, Location.Exit);
 		this.garageID = garageID;
 		this.GuiID = ++count;
-		// this.LPR = new LicensePlateReader(garageID, Location.Exit, queue);
 		this.ticket = null;
 		this.getUnpaidCallback = getUnpaidCallback;
 		this.paidTicketCallback = paidTicketCallback;
@@ -68,21 +64,12 @@ public class DriverGUI implements Runnable {
 	@Override
 	public void run() {
 		SwingUtilities.invokeLater(this::createWindow);
-		// createWindow();
 	}
 
 	private void createWindow() {
-//		String name = "Exit GUI for Garage ID #" + garageID + ", GUI #" + GuiID;
-//		JFrame frame = new JFrame(name);
-//		frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
-//
-//		createUI(frame);
-//		frame.setSize(400, 400);
-//		frame.setLocationRelativeTo(null); // Center on screen
-//		frame.setVisible(true); // make visible
 		String frameTitle = "Exit GUI for Garage ID #" + garageID + ", GUI #" + GuiID;
 		JFrame frame = new JFrame(frameTitle);
-		frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
+		frame.setDefaultCloseOperation(JFrame.DO_NOTHING_ON_CLOSE);
 		frame.setLayout(new FlowLayout(FlowLayout.CENTER));
 
 		createUI(frame);
@@ -136,23 +123,24 @@ public class DriverGUI implements Runnable {
 		frame.add(panel);
 		// ===END OF ORGANIZATION OF BUTTONS AND LABELS IN PANEL
 
+		// payButton will validate payment
 		payButton.addActionListener((ActionEvent e) -> {
 			payButtonClicked();
 		});
 
+		// call the callback function in ParkingGarage, so Parking Garage will send
+		// Message to Server to get an unpaid ticket
 		leaveButton.addActionListener((ActionEvent e) -> {
-			getUnpaidCallback.run(GuiID); // triggers client to send GET_UNPAID
+			getUnpaidCallback.run(GuiID);
 		});
 
-		// result.add(durationLabel);
-		// result.add(plateLabel);
-		// result.add(feeLabel);
-		// frame.getContentPane().setLayout(new BorderLayout(8, 8));
-		// frame.getContentPane().add(panel, BorderLayout.NORTH);
-		// frame.getContentPane().add(new JScrollPane(logArea), BorderLayout.CENTER);
 	}
 
-	/** Safe to call from ANY thread. */
+	/*
+	 * ASYNCH FUNCTION Safe to call from ANY thread. Pulls info from ticket, set
+	 * that information onto labels & buttons if it exists. this showUnpaidTicket
+	 * will be called on the ParkingGarage once the Server responded with a ticket
+	 */
 	public void showUnpaidTicket(Ticket t) {
 		SwingUtilities.invokeLater(() -> {
 			this.ticket = t;
@@ -161,26 +149,32 @@ public class DriverGUI implements Runnable {
 				durationLabel.setText("None");
 				plateLabel.setText("-");
 				feeLabel.setText("-");
-				// appendLine("No unpaid ticket found.");
 
 			} else {
-				durationLabel.setText(String.valueOf(t.getDurationOfStay().getSeconds()) + " seconds");
+				Duration duration = t.getDurationOfStay();
+
+				// formate the duration to hr/mins/s using the function in ShareFunctions
+				String durationString = ShareFunctions.formatDuration(duration);
+				durationLabel.setText(durationString);
 				plateLabel.setText(t.getLicensePlate());
 				feeLabel.setText(String.format("$%.2f", t.getFee()));
-				// appendLine("Received unpaid ticket: " + t);
 				payButton.setEnabled(true);
 			}
 
 		});
 	}
 
+	// Allows the payment processor to use a Credit Card object to determine if
+	// payment is authorized
 	public void payButtonClicked() {
-		CreditCard creditCard = new CreditCard();
-		PaymentCollector paymentCollector = new PaymentCollector(creditCard);
 
+		// Create a new credit card in paymentCollector
+		PaymentCollector paymentCollector = new PaymentCollector(new CreditCard());
+
+		// check if credit card is valid.
 		if (paymentCollector.validatePayment()) {
 			welcomeText.setText("Gate is Open, Please Exit.");
-			question.setText("Thank you!");
+			question.setText("Thank you for visiting!");
 			leaveButton.setEnabled(false);
 			payButton.setEnabled(false);
 			Thread thread = new Thread(() -> {
@@ -192,17 +186,21 @@ public class DriverGUI implements Runnable {
 			thread.start();
 			paidTicketCallback.run(GuiID, ticket);
 		} else {
-			welcomeText.setText("Invalid credit card, Please Pay again.");
+			welcomeText.setText("Invalid credit card!");
+			question.setText("Please try paying again.");
 			payButton.setEnabled(true);
+			leaveButton.setEnabled(false);
 		}
 
 	}
 
+	// Resets text for labels & buttons, resets buttons
 	public void resetGUI() {
 		durationLabel.setText("-");
 		plateLabel.setText("-");
 		feeLabel.setText("-");
-		welcomeText.setText("Thanks for staying. Are you leaving?");
+		welcomeText.setText("Thanks for staying!");
+		question.setText("Ready to leave?");
 		// appendLine("Received unpaid ticket: " + t);
 		payButton.setEnabled(false);
 		leaveButton.setEnabled(true);

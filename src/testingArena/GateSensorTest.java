@@ -25,7 +25,8 @@ class GateSensorTest {
 	void resetTest() {
 		GateSensor gateSensor = new GateSensor();
 		gateSensor.reset();
-		assertTrue(gateSensor.getCarDetected() == false && gateSensor.isCarExited() == false);
+		assertTrue(gateSensor.getCarDetected() == false 
+				&& gateSensor.isCarExited() == false);
 	}
 	//Unable to test run();
 }
