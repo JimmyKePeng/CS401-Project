@@ -63,7 +63,7 @@ public class ShareFunctions {
 	public static boolean saveReport(Report report, String filename) {
 		if (!filename.isEmpty()) {
 			filename = filename + ".txt";
-			try (FileWriter writer = new FileWriter(filename, true)) {
+			try (FileWriter writer = new FileWriter(filename)) {
 				writer.write(report.toString()); // Writes to file Ticket information
 				return true;
 			} catch (IOException e) {
