@@ -7,6 +7,8 @@ import parkingGarage.Report;
 import parkingGarage.Ticket;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Duration;
+
 
 
 
@@ -30,6 +32,36 @@ class ReportTest {
 		    assertEquals(-1, myReport.getYear());
 		
 	}
+	
+	
+	@Test
+	// my test here is to make sure that the method actually calculates the correct avg
+	void testAvgStayTimeCalculation() {
+
+	    
+	    Ticket ticket1 = new Ticket();
+	    ticket1.setDurationOfStay(Duration.ofSeconds(60));
+
+	
+	    Ticket ticket2 = new Ticket();
+	    ticket2.setDurationOfStay(Duration.ofSeconds(120));
+
+	    List<Ticket> tickets = new ArrayList<>();
+	    tickets.add(ticket1);
+	    tickets.add(ticket2);
+
+	    Report myReport = new Report(5, tickets);
+
+	    // average should be (60 + 120) / 2 = 90 seconds
+	    assertEquals(90, myReport.getAvgStayTIme());
+	}
+
+	
+	
+	
+	
+	
+	
 	
 	@Test
 	// I'm testing if the toString actually works if it contains the right information that we assigned in it
