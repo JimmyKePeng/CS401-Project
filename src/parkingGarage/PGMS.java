@@ -26,33 +26,44 @@ public class PGMS {
 
 	// Private Variables
 	private static int garageCount = 0;
+
+	// numberOfGarage.txt store the total number of registered parking garages
+	// when PGMS runs, it will read the number stored on numberOfGarage.txt and
+	// store it on garageCount
 	static String numberOfGarageFileName = "numberOfGarage.txt";
 
+	// store the online Parking Garage Handler on dictionary, map it by integer.
 	private static final ConcurrentMap<Integer, ClientHandler> clientsByGarageId = new ConcurrentHashMap<>();
+
+	// fileLockhandler to prevent two or more functions trying to access the same
+	// file at the same time.
 	private final static Object fileLockHandler = new Object();
+
 	private static PGMSOwnerGUI ownerGUI;
 
 	// Program Main Section
 	public static void main(String[] args) {
 
-		// Lazy Instantiation of ServerSocket
 		ServerSocket server = null;
 
 		try {
-			checkTotalGarages();
+			checkTotalGarages(); // and the number of garages in txt to garageCount;
 		} catch (IOException e) {
 			e.printStackTrace();
 		}
 
 		// Building a Server GUI for owner to operate;
+		// Create the callback functions and pass into the thread(OwnerGUI), so the
+		// thread can have GUI do certain tasks for the GUI
 		PGMSOwnerGUISetRateCB setRateCallback = PGMS::getSetRateCallback;
 		GUISearchTicketCB GUISearchTicketCallback = PGMS::getSearchTicketCallback;
 		GUIgetReportCB ownerGetReportCallback = PGMS::getOwnerGetReportCallback;
 		GUIgetReportByMonthYearCB ownerGetReportByMonthYearCallback = PGMS::getOwnerGetReportByMonthYearCallback;
+
+		// initialize the GUI and run it on a thread
 		ownerGUI = new PGMSOwnerGUI(garageCount, setRateCallback, GUISearchTicketCallback, ownerGetReportCallback,
 				ownerGetReportByMonthYearCallback);
-
-		ownerGUI.run();
+		new Thread(ownerGUI).start();
 		// end of building Server GUI
 
 		try {
@@ -80,11 +91,12 @@ public class PGMS {
 		}
 	}
 
+	// Multi-thread Client Handler
 	private static class ClientHandler implements Runnable {
 
 		// Private Variables
 		private final Socket clientSocket;
-		private int garageID;
+		private int garageID; // garageID is the identifier for each garages
 		boolean loggedIn = false;
 		private MsgTypes msgType;
 
@@ -113,29 +125,27 @@ public class PGMS {
 					// Attain Message Type
 					msgType = inMsg.getMsgType();
 
-					if (!loggedIn) {
-						if (msgType == MsgTypes.NEWGARAGE) { // If not logged in and MsgType == NEWGARAGE
+					if (!loggedIn) { // If not logged in
+						if (msgType == MsgTypes.NEWGARAGE) { // and MsgType == NEWGARAGE
 							garageID = garageCount++; // Increase Garage Count and Assign that to Garage ID
 							createNewGarage(garageID); // Run Function createNewGarage with Current Garage ID
 
 						} else if (msgType == MsgTypes.GARAGELOGIN) { // If garage existed
-							garageID = inMsg.getGarageID();
-							// loadGarage(garageID); // get the garageID and load tickets for garage
+							garageID = inMsg.getGarageID(); // get the garageID from incoming Messages
 						}
-						loggedIn = true; // Set this Garage to logged in
 
-						clientsByGarageId.put(garageID, this); // add the client to the clients hashmap
+						loggedIn = true; // Set this Garage to logged in
+						clientsByGarageId.put(garageID, this); // add the client to the clients hashmap in PGMS
 
 						// Create new Message object with MsgType
 						outMsg = new Message(MsgTypes.SUCCESS, garageID);
 						out.writeObject(outMsg); // Send response to Client
 
 					} else {
-						switch (msgType) { // If the garage is Logged In, Check MsgType
+						switch (msgType) { // If the garage is Logged In, Check MsgType and do specific task
 
-						// MsgType NEWTICKET adds Ticket to File & Array UNPAIDTICKETS
-						// Creates new ticket with RECEIVED MsgType w/ Garage ID to send to Client as
-						// response
+						// MsgType NEWTICKET adds Ticket to this garage unpaid txt file
+						// Creates new ticket with RECEIVED MsgType w/ Garage ID and respond to client
 						case NEWTICKET: {
 							addNewTicketToFile(inMsg);
 							// Response to Client
@@ -145,11 +155,9 @@ public class PGMS {
 							break;
 						}
 
-						// MsgType LOOKUPTICKET creates a new Ticket object from the client's request
-						// If ticket is found from the two dimensional array, send ticket 'reply' to
-						// client
+						// MsgType LOOKUPUNPAIDTICKET will pull up a random unpaid ticket and sent it
+						// back to client
 						case LOOKUPUNPAIDTICKET: {
-
 							Ticket ticket = lookUpUnpaidTicket(garageID, inMsg);
 							if (ticket != null) {
 								outMsg = new Message(MsgTypes.LOOKUPUNPAIDTICKET, garageID);
@@ -241,13 +249,13 @@ public class PGMS {
 			String fileNamePaid = "garage#" + Integer.toString(garageID) + "_paid.txt";
 			String fileNameUnpaid = "garage#" + Integer.toString(garageID) + "_unpaid.txt";
 
-			// Creates both text files
+			// Creates both text files with garageID to store paid and unpaid tickets
 			try (FileWriter writerPaid = new FileWriter(fileNamePaid, true);
 					FileWriter writerUnpaid = new FileWriter(fileNameUnpaid, true)) {
 				System.out.println("Created New Garage # " + garageID);
 			}
 
-			// save total number of garages on server
+			// update the total number of garages on server file
 			synchronized (fileLockHandler) {
 				try (FileWriter writer = new FileWriter(numberOfGarageFileName)) {
 					writer.write(String.valueOf(garageCount));
@@ -259,8 +267,8 @@ public class PGMS {
 		private void addNewTicketToFile(Message inMsg) throws IOException {
 			synchronized (fileLockHandler) {
 				String fileNameUnpaid = "garage#" + garageID + "_unpaid.txt"; // Find appropriate file name
-				try (FileWriter writer = new FileWriter(fileNameUnpaid, true)) { // Opens file
-					writer.write(inMsg.getTicket().toString()); // Writes to file Ticket information
+				try (FileWriter writer = new FileWriter(fileNameUnpaid, true)) { // Opens and append to file
+					writer.write(inMsg.getTicket().toString()); // Writes Ticket information to file
 				}
 			}
 
@@ -268,7 +276,6 @@ public class PGMS {
 
 		// Lookup Unpaid Ticket
 		private Ticket lookUpUnpaidTicket(int garageID, Message inMsg) throws IOException {
-
 			List<Ticket> unPaidList = loadUnpaidTicket();
 			Ticket ticket = null; // Create a ticket object
 			if (unPaidList != null && !unPaidList.isEmpty()) {
@@ -361,14 +368,16 @@ public class PGMS {
 		private boolean isOperatorAuthenticated(Message inMsg) throws FileNotFoundException, IOException {
 			String operatorUsername = inMsg.getOperator().getUsername();
 			String operatorPw = inMsg.getOperator().getPassword();
-			try (BufferedReader reader = new BufferedReader(new FileReader("username_pw.txt"))) {
-				String line;
-				while ((line = reader.readLine()) != null) {
-					String[] parts = line.split(",");
-					if (operatorUsername.equals(parts[0]) && operatorPw.equals(parts[1])) {
-						return true;
-					}
+			synchronized (fileLockHandler) {
+				try (BufferedReader reader = new BufferedReader(new FileReader("username_pw.txt"))) {
+					String line;
+					while ((line = reader.readLine()) != null) {
+						String[] parts = line.split(",");
+						if (operatorUsername.equals(parts[0]) && operatorPw.equals(parts[1])) {
+							return true;
+						}
 
+					}
 				}
 			}
 			return false;
@@ -443,9 +452,9 @@ public class PGMS {
 	}
 
 	private static void checkTotalGarages() throws IOException {
-		// check if the server is running the first time.
-		// if its running the first time, create the file and save it.
-		// otherwise load the total of garage from file to garageCount;
+		// check if the server is running the first time. if its running the first time,
+		// create the file and save 0 on it since theres 0 registered garages. otherwise
+		// load the total of garage from file to garageCount;
 		File file = new File(numberOfGarageFileName);
 		if (file.exists()) {
 			String garageNumber;
@@ -454,7 +463,7 @@ public class PGMS {
 				garageCount = Integer.parseInt(garageNumber);
 			}
 		} else {
-			try (FileWriter writer = new FileWriter(numberOfGarageFileName, true)) {
+			try (FileWriter writer = new FileWriter(numberOfGarageFileName)) {
 				writer.write(String.valueOf(garageCount));
 			}
 		}
