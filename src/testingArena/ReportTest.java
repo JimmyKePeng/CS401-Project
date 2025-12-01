@@ -55,6 +55,32 @@ class ReportTest {
 		assertEquals(90, myReport.getAvgStayTIme());
 	}
 
+	
+	@Test
+	
+	void testTotalfee() {
+	Ticket ticket1 = new Ticket();	
+	Ticket ticket2 = new Ticket();
+	
+	ticket1.setFee(3.5);
+	ticket2.setFee(4.2);
+	
+	List<Ticket> tickets = new ArrayList<>();
+	
+	tickets.add(ticket1);
+	tickets.add(ticket2);
+	
+	Report myReport = new Report(7,tickets);
+	
+      double total = myReport.getTotalFee();
+      
+      assertEquals(7.7,total,.0001);
+	
+	
+	}
+	
+	
+	
 	@Test
 	// I'm testing if the toString actually works if it contains the right
 	// information that we assigned in it
