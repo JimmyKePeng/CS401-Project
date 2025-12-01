@@ -27,11 +27,6 @@ public class PGMS {
 	// Private Variables
 	private static int garageCount = 0;
 
-	// numberOfGarage.txt store the total number of registered parking garages
-	// when PGMS runs, it will read the number stored on numberOfGarage.txt and
-	// store it on garageCount
-	static String numberOfGarageFileName = "numberOfGarage.txt";
-
 	// store the online Parking Garage Handler on dictionary, map it by integer.
 	private static final ConcurrentMap<Integer, ClientHandler> clientsByGarageId = new ConcurrentHashMap<>();
 
@@ -67,7 +62,7 @@ public class PGMS {
 		// end of building Server GUI
 
 		try {
-			server = new ServerSocket(7777); // Run server on Socket 7777
+			server = new ServerSocket(GlobalVariables.port); // Run server on Socket 7777
 			server.setReuseAddress(true);
 
 			while (true) { // Run server perpetually
@@ -252,8 +247,8 @@ public class PGMS {
 		// Function to Create a new Garage with a garage ID
 		private void createNewGarage(int garageID) throws IOException {
 
-			String fileNamePaid = "garage#" + Integer.toString(garageID) + "_paid.txt";
-			String fileNameUnpaid = "garage#" + Integer.toString(garageID) + "_unpaid.txt";
+			String fileNamePaid = Integer.toString(garageID) + GlobalVariables.paidFilename;
+			String fileNameUnpaid = Integer.toString(garageID) + GlobalVariables.unpaidFilename;
 
 			// Creates both text files with garageID to store paid and unpaid tickets
 			try (FileWriter writerPaid = new FileWriter(fileNamePaid, true);
@@ -263,7 +258,10 @@ public class PGMS {
 
 			// update the total number of garages on server file
 			synchronized (fileLockHandler) {
-				try (FileWriter writer = new FileWriter(numberOfGarageFileName)) {
+				// numberOfGarage.txt store the total number of registered parking garages
+				// when PGMS runs, it will read the number stored on numberOfGarage.txt and
+				// store it on garageCount
+				try (FileWriter writer = new FileWriter(GlobalVariables.numberOfGarageFilename)) {
 					writer.write(String.valueOf(garageCount));
 				}
 			}
@@ -272,7 +270,8 @@ public class PGMS {
 		// Adds new Ticket to file
 		private void addNewTicketToFile(Message inMsg) throws IOException {
 			synchronized (fileLockHandler) {
-				String fileNameUnpaid = "garage#" + garageID + "_unpaid.txt"; // Find appropriate file name
+				String fileNameUnpaid = Integer.toString(garageID) + GlobalVariables.unpaidFilename; // Find appropriate
+																										// file name
 				try (FileWriter writer = new FileWriter(fileNameUnpaid, true)) { // Opens and append to file
 					writer.write(inMsg.getTicket().toString()); // Writes Ticket information to file
 				}
@@ -299,7 +298,8 @@ public class PGMS {
 		private void ticketIsPaid(Message inMsg) throws IOException {
 
 			Ticket ticket = inMsg.getTicket();
-			String fileNamePaid = "garage#" + garageID + "_paid.txt"; // Find appropriate file name
+			String fileNamePaid = Integer.toString(garageID) + GlobalVariables.paidFilename;
+			// Find appropriate file name
 
 			// add the paid ticket to paid txt file
 			synchronized (fileLockHandler) {
@@ -313,7 +313,7 @@ public class PGMS {
 				// read everyline of the file and check ticket
 				// add the line of string that doesnt match the "ticket" to a string builder and
 				// write it back to the file
-				String fileNameUnpaid = "garage#" + garageID + "_unpaid.txt";
+				String fileNameUnpaid = Integer.toString(garageID) + GlobalVariables.unpaidFilename;
 				synchronized (fileLockHandler) {
 					StringBuilder fileInfo = new StringBuilder();
 
@@ -336,7 +336,7 @@ public class PGMS {
 
 		// helper function that load the unpaid txt file into a list and return it
 		private List<Ticket> loadUnpaidTicket() {
-			String fileNameUnpaid = "garage#" + Integer.toString(garageID) + "_unpaid.txt";
+			String fileNameUnpaid = Integer.toString(garageID) + GlobalVariables.unpaidFilename;
 			List<Ticket> unPaidList = new ArrayList<Ticket>();
 			File file = new File(fileNameUnpaid);
 			synchronized (fileLockHandler) {
@@ -355,7 +355,7 @@ public class PGMS {
 
 		// helper function that load the paid txt file into a list and return it
 		private List<Ticket> loadpaidTicket() {
-			String fileNamepaid = "garage#" + Integer.toString(garageID) + "_paid.txt";
+			String fileNamepaid = Integer.toString(garageID) + GlobalVariables.paidFilename;
 			List<Ticket> PaidList = new ArrayList<Ticket>();
 			File file = new File(fileNamepaid);
 			synchronized (fileLockHandler) {
@@ -377,7 +377,7 @@ public class PGMS {
 			String operatorUsername = inMsg.getOperator().getUsername();
 			String operatorPw = inMsg.getOperator().getPassword();
 			synchronized (fileLockHandler) {
-				try (BufferedReader reader = new BufferedReader(new FileReader("username_pw.txt"))) {
+				try (BufferedReader reader = new BufferedReader(new FileReader(GlobalVariables.operatorPwFilename))) {
 					String line;
 					while ((line = reader.readLine()) != null) {
 						String[] parts = line.split(",");
@@ -459,7 +459,7 @@ public class PGMS {
 		// check if the server is running the first time. if its running the first time,
 		// create the file and save 0 on it since theres 0 registered garages. otherwise
 		// load the total of garage from file to garageCount;
-		File file = new File(numberOfGarageFileName);
+		File file = new File(GlobalVariables.numberOfGarageFilename);
 		if (file.exists()) {
 			String garageNumber;
 			try (Scanner scanner = new Scanner(file)) {
@@ -467,7 +467,7 @@ public class PGMS {
 				garageCount = Integer.parseInt(garageNumber);
 			}
 		} else {
-			try (FileWriter writer = new FileWriter(numberOfGarageFileName)) {
+			try (FileWriter writer = new FileWriter(GlobalVariables.numberOfGarageFilename)) {
 				writer.write(String.valueOf(garageCount));
 			}
 		}
@@ -505,8 +505,8 @@ public class PGMS {
 	public static Ticket getSearchTicketCallback(String licensePlate) {
 		for (int i = 0; i < garageCount; i++) { // loop over all the garage txt files
 
-			String fileNamePaid = "garage#" + Integer.toString(i) + "_paid.txt";
-			String fileNameUnpaid = "garage#" + Integer.toString(i) + "_unpaid.txt";
+			String fileNamePaid = Integer.toString(i) + GlobalVariables.paidFilename;
+			String fileNameUnpaid = Integer.toString(i) + GlobalVariables.unpaidFilename;
 
 			File file = new File(fileNamePaid);
 			synchronized (fileLockHandler) {
@@ -546,7 +546,7 @@ public class PGMS {
 	// OwnerGUI will call this function. it will add all the paid tickets in the
 	// given garageID to a report and return the report
 	public static Report getOwnerGetReportCallback(int garageID) {
-		String fileNamePaid = "garage#" + Integer.toString(garageID) + "_paid.txt";
+		String fileNamePaid = Integer.toString(garageID) + GlobalVariables.paidFilename;
 
 		File file = new File(fileNamePaid);
 		Report report = null;
@@ -574,8 +574,7 @@ public class PGMS {
 	// button OwnerGUI will call this function. it will add all the paid tickets in
 	// the given garageID that match the month/year to report and return report
 	public static Report getOwnerGetReportByMonthYearCallback(int garageID, int month, int year) {
-		String fileNamePaid = "garage#" + garageID + "_paid.txt";
-
+		String fileNamePaid = Integer.toString(garageID) + GlobalVariables.paidFilename;
 		File file = new File(fileNamePaid);
 		Report report = null;
 
