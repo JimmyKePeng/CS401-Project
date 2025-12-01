@@ -119,7 +119,9 @@ public class PGMS {
 				// Create Message Object
 				Message inMsg;
 				Message outMsg;
-				// While the receiving Message is not null
+
+				// When received a Message from client, check what type of Message it is
+				// then jump to the appropriate task
 				while ((inMsg = (Message) in.readObject()) != null) {
 
 					// Attain Message Type
@@ -145,50 +147,55 @@ public class PGMS {
 						switch (msgType) { // If the garage is Logged In, Check MsgType and do specific task
 
 						// MsgType NEWTICKET adds Ticket to this garage unpaid txt file
+						// adds Ticket to this garage unpaid txt file
 						// Creates new ticket with RECEIVED MsgType w/ Garage ID and respond to client
 						case NEWTICKET: {
 							addNewTicketToFile(inMsg);
 							// Response to Client
 							outMsg = new Message(MsgTypes.RECEIVED, garageID);
-							out.writeObject(outMsg);
-							out.flush();
+							send(outMsg);
 							break;
 						}
 
 						// MsgType LOOKUPUNPAIDTICKET will pull up a random unpaid ticket and sent it
 						// back to client
+						// it will pull up a random unpaid ticket and sent it back to client
 						case LOOKUPUNPAIDTICKET: {
 							Ticket ticket = lookUpUnpaidTicket(garageID, inMsg);
 							if (ticket != null) {
 								outMsg = new Message(MsgTypes.LOOKUPUNPAIDTICKET, garageID);
 								outMsg.setTicket(ticket);
-								out.writeObject(outMsg);
-								out.flush();
+								send(outMsg);
 							}
 							break;
 						}
+
+						// incoming Message contain a paid ticket
+						// store it in file and remove it from unpaid file
 						case TICKETPAID: {
 							ticketIsPaid(inMsg);
 							break;
 						}
+
+						// authenticate operator and send success/fail back to client
 						case OPERATORLOGIN: {
-							if (isOperatorAuthenticated(inMsg)) {
+							if (isOperatorAuthenticated(inMsg)) { // success
 								outMsg = new Message(MsgTypes.OPERATORSUCCESS, garageID);
 								System.out.println("correct pw");
-								out.writeObject(outMsg);
-								out.flush();
-							} else {
+								send(outMsg);
+							} else { // or fail
 								outMsg = new Message(MsgTypes.OPERATORFAILURE, garageID);
 								System.out.println("wrong pw");
-								out.writeObject(outMsg);
-								out.flush();
+								send(outMsg);
 							}
 							break;
 
 						}
+
+						// pull all history tickets for a garage and send report back to client
 						case GETREPORT: {
 							outMsg = new Message(MsgTypes.GETREPORT, garageID);
-							List<Ticket> reportTickets = getReportTickets();
+							List<Ticket> reportTickets = loadpaidTicket();
 							Report report = null;
 							if (reportTickets.size() != 0) {
 								report = new Report(garageID, reportTickets);
@@ -196,10 +203,12 @@ public class PGMS {
 							Operator operator = new Operator();
 							operator.setReport(report);
 							outMsg.setOperator(operator);
-							out.writeObject(outMsg);
-							out.flush();
+							send(outMsg);
 							break;
 						}
+
+						// pull all history tickets for a garage with filters of month/year
+						// and send it back to client
 						case GETREPORTBYMONTHYEAR: {
 							outMsg = new Message(MsgTypes.GETREPORTBYMONTHYEAR, garageID);
 							int month = inMsg.getOperator().getReport().getMonth();
@@ -212,16 +221,16 @@ public class PGMS {
 							Operator operator = new Operator();
 							operator.setReport(report);
 							outMsg.setOperator(operator);
-							out.writeObject(outMsg);
-							out.flush();
+							send(outMsg);
 							break;
 						}
+
+						// search a ticket and send it back to client
 						case SEARCHTICKET: {
 							Ticket ticket = searchTicket(inMsg.getTicket());
 							outMsg = new Message(MsgTypes.SEARCHTICKET, garageID);
 							outMsg.setTicket(ticket);
-							out.writeObject(outMsg);
-							out.flush();
+							send(outMsg);
 							break;
 						}
 						default:
@@ -277,17 +286,17 @@ public class PGMS {
 		// Lookup Unpaid Ticket
 		private Ticket lookUpUnpaidTicket(int garageID, Message inMsg) throws IOException {
 			List<Ticket> unPaidList = loadUnpaidTicket();
-			Ticket ticket = null; // Create a ticket object
-			if (unPaidList != null && !unPaidList.isEmpty()) {
-				Random random = new Random(); // Create a random object
+			Ticket ticket = null;
+			if (unPaidList != null && !unPaidList.isEmpty()) { // when the list contain tickets
+				Random random = new Random();
 				int index = random.nextInt(unPaidList.size());
+				ticket = unPaidList.get(index); // Grab a random ticket to return
 
-				ticket = unPaidList.get(index); // Grab random ticket to send to client
-				ticket.setGuiID(inMsg.getTicket().getGuiID()); // so the client know which GUI requesting the exit
-																// ticket
+				// Must set GUI id to the appropriate GUI id, so client know which GUI is
+				// requesting unpaid ticket
+				ticket.setGuiID(inMsg.getTicket().getGuiID());
 			}
-
-			return ticket; // return random ticket to client
+			return ticket;
 		}
 
 		private void ticketIsPaid(Message inMsg) throws IOException {
@@ -295,7 +304,7 @@ public class PGMS {
 			Ticket ticket = inMsg.getTicket();
 			String fileNamePaid = "garage#" + garageID + "_paid.txt"; // Find appropriate file name
 
-			// add the paid ticket to file
+			// add the paid ticket to paid txt file
 			synchronized (fileLockHandler) {
 				try (FileWriter writer = new FileWriter(fileNamePaid, true)) {
 					writer.write(ticket.toString());
@@ -328,6 +337,7 @@ public class PGMS {
 			}
 		}
 
+		// helper function that load the unpaid txt file into a list and return it
 		private List<Ticket> loadUnpaidTicket() {
 			String fileNameUnpaid = "garage#" + Integer.toString(garageID) + "_unpaid.txt";
 			List<Ticket> unPaidList = new ArrayList<Ticket>();
@@ -346,6 +356,7 @@ public class PGMS {
 			return unPaidList;
 		}
 
+		// helper function that load the paid txt file into a list and return it
 		private List<Ticket> loadpaidTicket() {
 			String fileNamepaid = "garage#" + Integer.toString(garageID) + "_paid.txt";
 			List<Ticket> PaidList = new ArrayList<Ticket>();
@@ -364,7 +375,7 @@ public class PGMS {
 			return PaidList;
 		}
 
-		// check if Operator username and pw exist when client's operator want to log in
+		// authenticate Operator username/pw.
 		private boolean isOperatorAuthenticated(Message inMsg) throws FileNotFoundException, IOException {
 			String operatorUsername = inMsg.getOperator().getUsername();
 			String operatorPw = inMsg.getOperator().getPassword();
@@ -383,7 +394,8 @@ public class PGMS {
 			return false;
 		}
 
-		// Operator search ticket, PGMS pull and send ticket back to client
+		// When Operator search ticket, Server will load paid/unpaid tickets from file
+		// and return the ticket if exist, else return the original ticket
 		private Ticket searchTicket(Ticket targetTicket) {
 			Ticket ticket = targetTicket;
 			List<Ticket> tickets = loadpaidTicket();
@@ -401,6 +413,7 @@ public class PGMS {
 			return ticket;
 		}
 
+		// helper function that will send the given Msg to client
 		public void send(Message msg) throws IOException {
 			synchronized (out) { // ensure only one thread writes at a time
 				try {
@@ -412,19 +425,13 @@ public class PGMS {
 			}
 		}
 
-		private List<Ticket> getReportTickets() {
-			List<Ticket> paidList = loadpaidTicket();
-			return paidList;
-
-		}
-
 		private List<Ticket> searchTicketByMonthYear(int month, int year) {
 			List<Ticket> source = loadpaidTicket();
-			// read ticket from file and add it source;
+			// read ticket from file and store on source;
 
 			// the reason we read it from file to source first, is because we don't want to
 			// keep the file open for too long for this thread
-			// filter the month/year
+			// then filter the month/year
 			List<Ticket> copy = new ArrayList<>();
 			if (!source.isEmpty()) {
 				for (Ticket ticket : source) {
@@ -432,11 +439,11 @@ public class PGMS {
 					int ticketYear = ticket.getEntryTime().getYear();
 
 					boolean matches = true;
-					// filter month
+					// filter month, if month is given and month doesnt match, do not add
 					if (month != -1 && ticketMonth != month) {
 						matches = false;
 					}
-					// filter year
+					// filter year, if year is given and year doesnt match, do not add
 					if (year != -1 && ticketYear != year) {
 						matches = false;
 					}
@@ -469,7 +476,12 @@ public class PGMS {
 		}
 	}
 
-	// ============ PGMS OwnerGUI callback functions ===================
+	// =============== PGMS OwnerGUI callback functions ===================
+
+	// When owner entered garageID and rate on OwnerGUI, OwnerGUI will call this
+	// function. it will create a Message type of SETRATE, so client know the server
+	// is trying to set the rate for the garage. if successful send Message to
+	// client, return true
 	public static boolean getSetRateCallback(int garageID, double rate) {
 		try {
 			ClientHandler handler = clientsByGarageId.get(garageID);
@@ -477,10 +489,7 @@ public class PGMS {
 				System.out.println("Garage " + garageID + " not connected.");
 				return false;
 			}
-
 			Message msg = new Message(MsgTypes.SETRATE, garageID);
-
-			// Use a dedicated object instead of misusing Ticket for rate data
 			Ticket ticket = new Ticket(garageID, rate);
 			msg.setTicket(ticket);
 
@@ -493,12 +502,15 @@ public class PGMS {
 		}
 	}
 
+	// When owner entered licensePlate on OwnerGUI and press "Search" button,
+	// OwnerGUI will call this function. it will search all the garage paid/unpaid
+	// txt files, if license plate match, return the ticket
 	public static Ticket getSearchTicketCallback(String licensePlate) {
-		for (int i = 0; i < garageCount; i++) {
+		for (int i = 0; i < garageCount; i++) { // loop over all the garage txt files
 
 			String fileNamePaid = "garage#" + Integer.toString(i) + "_paid.txt";
 			String fileNameUnpaid = "garage#" + Integer.toString(i) + "_unpaid.txt";
-			// set entry time to null to show this ticket is not a regular ticket
+
 			File file = new File(fileNamePaid);
 			synchronized (fileLockHandler) {
 				try (Scanner scanner = new Scanner(file)) {
@@ -533,6 +545,9 @@ public class PGMS {
 		return null;
 	};
 
+	// When owner entered garageID on OwnerGUI, and press "Get Full Report" button
+	// OwnerGUI will call this function. it will add all the paid tickets in the
+	// given garageID to a report and return the report
 	public static Report getOwnerGetReportCallback(int garageID) {
 		String fileNamePaid = "garage#" + Integer.toString(garageID) + "_paid.txt";
 
@@ -558,6 +573,9 @@ public class PGMS {
 		return report;
 	}
 
+	// When owner entered garageID/month/year on OwnerGUI, and press "Get Report"
+	// button OwnerGUI will call this function. it will add all the paid tickets in
+	// the given garageID that match the month/year to report and return report
 	public static Report getOwnerGetReportByMonthYearCallback(int garageID, int month, int year) {
 		String fileNamePaid = "garage#" + garageID + "_paid.txt";
 
@@ -566,7 +584,6 @@ public class PGMS {
 
 		if (file.exists()) {
 			List<Ticket> paidList = new ArrayList<>();
-
 			synchronized (fileLockHandler) {
 				try (Scanner scanner = new Scanner(file)) {
 					while (scanner.hasNextLine()) {
@@ -577,13 +594,11 @@ public class PGMS {
 						int ticketYear = ticket.getEntryTime().getYear();
 
 						boolean matches = true;
-
-						// If month filter provided, enforce it
+						// filter month, if month is given and month doesnt match, do not add
 						if (month != -1 && ticketMonth != month) {
 							matches = false;
 						}
-
-						// If year filter provided, enforce it
+						// filter year, if year is given and year doesnt match, do not add
 						if (year != -1 && ticketYear != year) {
 							matches = false;
 						}

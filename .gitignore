@@ -1,2 +1,4 @@
 /bin/
 *.txt
+!owner_pw.txt
+!username_pw.txt

@@ -2,15 +2,10 @@ package parkingGarage;
 
 import java.io.File;
 import java.io.FileWriter;
-//java.io.*
 import java.io.IOException;
-import java.io.InputStream;
 import java.io.ObjectInputStream;
 import java.io.ObjectOutputStream;
-import java.io.OutputStream;
-//java.net.*
 import java.net.Socket;
-//java.util.*
 import java.util.Map;
 import java.util.Scanner;
 import java.util.concurrent.BlockingQueue;
@@ -26,6 +21,8 @@ public class ParkingGarageClient {
 	private static volatile double ratePerSecond = 0.001;
 	private static String garageIDFileName = "garageId.txt";
 	private static String garageRateFileName = "garageRate.txt";
+	private static ObjectOutputStream out;
+	private static ObjectInputStream in;
 
 	// Program Main Section
 	public static void main(String[] args) {
@@ -47,16 +44,17 @@ public class ParkingGarageClient {
 			Socket socket = new Socket("10.0.0.106", 7777);// IP address should replace localhost
 
 			// Create ObjectOutputStream from the OutPutStream
-			OutputStream outputStream = socket.getOutputStream();
-			ObjectOutputStream out = new ObjectOutputStream(outputStream);
+
+			out = new ObjectOutputStream(socket.getOutputStream());
 			out.flush();
 
 			// Create ObjectInputStream from the InputStream
-			InputStream inputStream = socket.getInputStream();
-			ObjectInputStream in = new ObjectInputStream(inputStream);
+			in = new ObjectInputStream(socket.getInputStream());
 
 			File file = new File(garageIDFileName);
 
+			// check if this garage is already registered
+			// if a garage is registered, there's a file saved garageID, a file saved rate
 			if (file.exists()) {
 				String garageNumber;
 				String parkingRate;
@@ -75,8 +73,8 @@ public class ParkingGarageClient {
 				ratePerSecond = Double.parseDouble(parkingRate);
 
 				Message outMsg = new Message(MsgTypes.GARAGELOGIN, assignedID);
-				out.writeObject(outMsg);
-				out.flush();
+				// let server know that this garage is trying to login.
+				send(outMsg);
 				Message inMsg = (Message) in.readObject();
 				if (!loggedIn && inMsg.getMsgType() == MsgTypes.SUCCESS) {
 					loggedIn = true;
@@ -85,75 +83,77 @@ public class ParkingGarageClient {
 				// Create a new Message object, indicate MsgType as NEWGARAGE for new garage
 				// connecting to the server
 				Message outMsg = new Message(MsgTypes.NEWGARAGE, -1);
-				out.writeObject(outMsg); // Sends Message to Server
-				out.flush();
-
+				send(outMsg);
 				// Read Server Response through 'inMsg'
 				Message inMsg = (Message) in.readObject();
 
-				// If not logged in and the message type is equal to SUCCESS, log in and use
-				// assigned ID from server
+				// when return message type is equal to SUCCESS, that means server successfully
+				// created txt file that will store paid/unpaid tickets for this parking garage
 				if (!loggedIn && inMsg.getMsgType() == MsgTypes.SUCCESS) {
 					loggedIn = true;
 					assignedID = inMsg.getGarageID();
 					try (FileWriter writer = new FileWriter(garageIDFileName)) { // Opens file
-						writer.write(String.valueOf(assignedID));// Writes to assignedID to file
+						writer.write(String.valueOf(assignedID));// Writes assignedID to file
 					}
 					try (FileWriter writer = new FileWriter(garageRateFileName)) { // Opens file
-						writer.write(String.valueOf(ratePerSecond));// Writes to assignedID to file
+						writer.write(String.valueOf(ratePerSecond));// Writes default rate to file
 					}
 				}
 
 			}
 
-			// Constant (final) ID is assigned, constant 'running' is assigned a bool if
-			// SUCCESS or otherwise
+			// Constant (final) ID is assigned
+			// constant 'running' is assigned a bool if SUCCESS or otherwise
 			final int garageID = assignedID;
 			final boolean running = loggedIn;
-			// double ratePerSecond = initialRate;
+
 			// ========LISTENING FOR LICENSE PLATE READER FOR LICENSE PLATE===========
+			// everytime a license plate reader read a plate, it will add the license plate
+			// into the queue, when plate is added to queue, it will create a new Ticket and
+			// send to server
 			Thread sender = new Thread(() -> { // Thread 'sender' is made, runs while logged in
 				try {
 					while (running) {
-						String plate = queue.take(); // Queue will wait (block) until there is a license plate in the
-														// queue
-						Ticket ticket = new Ticket(plate, garageID); // A new ticket object is made with the plate taken
-																		// from the queue
-						Message Msg = new Message(MsgTypes.NEWTICKET, garageID); // A message object is made with the
-																					// type NEWTICKET and garage ID
+						String plate = queue.take(); // Queue will wait (block) until there is a plate in the queue
+
+						// A new ticket object is made with the plate taken from the queue
+						Ticket ticket = new Ticket(plate, garageID);
+						Message Msg = new Message(MsgTypes.NEWTICKET, garageID);
 						Msg.setTicket(ticket); // Ticket object is set to the message
-						out.writeObject(Msg); // Message object is sent to the server
-						out.flush(); // flush stream
+						send(Msg);
 					}
-				} catch (InterruptedException | IOException ie) { // Exceptions to catch
+				} catch (InterruptedException ie) { // Exceptions to catch
 					System.out.println("Sender is disconnected.");
 				}
 			});
 			sender.start(); // Start Thread
-			// ========LISTENING FOR LICENSE PLATE READER FOR LICENSE PLATE===========
+			// ==== end of LISTENING FOR LICENSE PLATE READER FOR LICENSE PLATE=======
 
-			// =====================LISTENING FOR INCOMING MESSAGE================
+			// ====== begin LISTENING FOR INCOMING MESSAGE from server ================
 			Thread receiver = new Thread(() -> { // Thread 'receiver' is made while logged in
 				try {
 					while (running) {
-						Message msg = (Message) in.readObject(); // Read message from the input stream, wait until
-																	// Message received
+						// Read message from the input stream, wait until Message received
+						Message msg = (Message) in.readObject();
 
 						// Switch statement to handle message types
 						switch (msg.getMsgType()) {
 						case RECEIVED:
-							// System.out.println("Server RECEIVED new Ticket!");
+							// Server will respond with a Message when new ticket is Received
 							break;
-						case LOOKUPUNPAIDTICKET: { // Message Type LOOKUPTICKET
-							Ticket t = msg.getTicket(); // Pull ticket variable from received ticket into variable
+
+						case LOOKUPUNPAIDTICKET: {
+							Ticket t = msg.getTicket(); // get the unpaid ticket from Server Message
 							int id = t.getGuiID(); // Pull GUI ID from Ticket
-
-							// System.out.println("Looking up tickets in GUI# " + id);
-
 							t.calculateFee(ratePerSecond); // Calculate ticket fee amount, stored in Ticket
-							DriverGUI targetGUI = guiById.get(id); // Creates a DriverGUI object, initialized by
-																	// receiving the GUI object from associated ID Map
-							targetGUI.showUnpaidTicket(t); // GUI will show the unpaid Ticket
+							DriverGUI targetGUI = guiById.get(id); // get the DriverGUI object From the GuiById Map
+							targetGUI.showUnpaidTicket(t); // have the GUI(DriverGUI) at exit show the unpaid Ticket
+							break;
+						}
+						case SETRATE: {
+							// if Owner of PGMS want to set rate for this garage, a SETRATE Message type
+							// will be send to this client.
+							setRate(msg.getTicket().getRate());
 							break;
 						}
 						case OPERATORSUCCESS: {
@@ -161,20 +161,22 @@ public class ParkingGarageClient {
 							operatorGUI.loggedInSuccess();
 							break;
 						}
-						case SETRATE: {
-							setRate(msg);
-							break;
-						}
 						case OPERATORFAILURE: {
-							// if operator logged in successfully
+							// if operator failed to log in
 							operatorGUI.loggedInFail();
 							break;
 						}
 						case GETREPORT, GETREPORTBYMONTHYEAR: {
+							// After Operator press "GetReport" button, This client will send Message type
+							// GETREPORT to Server, Server get the report and send it here.
+							// OperatorGUI display the report
 							operatorGUI.displayReport(msg.getOperator().getReport());
 							break;
 						}
 						case SEARCHTICKET: {
+							// After Operator press "Search" button, This client will send Message type
+							// SEARCHTICKET to Server, Server search the ticket and and send it here.
+							// OperatorGUI display the ticket
 							operatorGUI.displayTicket(msg.getTicket());
 						}
 						default:
@@ -186,37 +188,26 @@ public class ParkingGarageClient {
 				}
 			});
 			receiver.start();
-			// ======================LISTENING FOR INCOMING MESSAGE================
+			// ============ end of LISTENING FOR INCOMING MESSAGE================
 
-			// ==CREATE LICENSE PLATE READERS AND RUN THEM TO 'READ' LICENSE PLATES
+			// ==CREATE LICENSE PLATE READERS AND RUN THEM TO 'READ' LICENSE PLATES=
 			LicensePlateReader entryLPR1 = new LicensePlateReader(garageID, Location.Entry, queue);
 			LicensePlateReader entryLPR2 = new LicensePlateReader(garageID, Location.Entry, queue);
 			new Thread(entryLPR1).start();
 			new Thread(entryLPR2).start();
-			// == CREATE LICENSE PLATE READERS AND RUN THEM TO 'READ' LICENSE PLATES
+			// == CREATE LICENSE PLATE READERS AND RUN THEM TO 'READ' LICENSE PLATES=
 
-			// ========= CREATE GARAGE EXIT GUI ==================
-
+			// =========begin CREATE GARAGE EXIT GUI ==================
 			// === DEFINE THE CALLBACK FUNCTION AND PASS TO THE GUI ===
 			DriverGUIgetUnpaidTicketCB getUnpaidCallback = (int GuiID) -> { // Define call back function with parameter
-																			// int
-				// (GuiID)
-				try {
-					Message msg = new Message(MsgTypes.LOOKUPUNPAIDTICKET, garageID); // Create new message with message
-																						// type
-					// LOOKUPTICKET and this instance of
-					// GarageID
-					Ticket ticket = new Ticket(); // New Ticket object
-					ticket.setGarageID(garageID);
+				Message msg = new Message(MsgTypes.LOOKUPUNPAIDTICKET, garageID);
+				// LOOKUPTICKET with this instance of GarageID
+				Ticket ticket = new Ticket();
+				ticket.setGarageID(garageID);
 
-					ticket.setGuiID(GuiID); // Set the Ticket's GuiID with the callback function's GuiID
-					// System.out.println(GuiID);
-					msg.setTicket(ticket); // Assign the Ticket object to the Message
-					out.writeObject(msg); // Send Message to server
-					out.flush(); // Flush stream
-				} catch (IOException ex) {
-					ex.printStackTrace();
-				}
+				ticket.setGuiID(GuiID); // Set the Ticket's GuiID with the callback function's GuiID
+				msg.setTicket(ticket); // Assign the Ticket object to the Message
+				send(msg);
 			};
 
 			// this will send a Message contained paid ticket to server, and server save the
@@ -227,8 +218,7 @@ public class ParkingGarageClient {
 					// System.out.println(ticket.toString());
 					ticket.setTicketPaid();
 					msg.setTicket(ticket);
-					out.writeObject(msg);
-					out.flush();
+					send(msg);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -253,11 +243,11 @@ public class ParkingGarageClient {
 			// === DEFINE THE CALLBACK FUNCTION AND PASS TO THE Operator GUI ===
 			OperatorGUILoginCB operatorLoginCallback = (String username, String pw) -> {
 				try {
+					// this function sends the Operator username/pw to server for authentication
 					Message msg = new Message(MsgTypes.OPERATORLOGIN, garageID);
 					Operator operator = new Operator(username, pw, garageID);
 					msg.setOperator(operator);
-					out.writeObject(msg);
-					out.flush();
+					send(msg);
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -265,42 +255,20 @@ public class ParkingGarageClient {
 
 			GUIgetReportCB operatorGetReportCallback = (int garageId) -> {
 				try {
+					// this function sends a Message to Server indicating that client wants a Report
 					Message msg = new Message(MsgTypes.GETREPORT, garageID);
-					out.writeObject(msg);
-					out.flush();
+					send(msg);
 				} catch (Exception e) {
 					e.printStackTrace();
 
 				}
 				return null;
-			};
-
-			GUISearchTicketCB operatorGUISearchTicketCallback = (String licensePlate) -> {
-				try {
-					Message msg = new Message(MsgTypes.SEARCHTICKET, garageID);
-					Ticket ticket = new Ticket(licensePlate, garageID);
-					// set entry time to null to show this ticket is not a regular ticket
-					ticket.setEntryTime(null);
-					msg.setTicket(ticket);
-					out.writeObject(msg);
-					out.flush();
-				} catch (Exception e) {
-					e.printStackTrace();
-				}
-				return null;
-			};
-
-			OperatorGUISetRateCB operatorGUISetRateCallback = (double rate) -> {
-				ratePerSecond = rate;
-				try (FileWriter writer = new FileWriter(garageRateFileName)) { // Opens file
-					writer.write(String.valueOf(rate));// Writes to assignedID to file
-				} catch (IOException e) {
-					e.printStackTrace();
-				}
 			};
 
 			GUIgetReportByMonthYearCB getReportByMonthYearCallback = (int OptionalgarageID, int month, int year) -> {
 				try {
+					// this function sends a Message to Server indicating that client wants a Report
+					// with filters of month/year
 					Message msg = new Message(MsgTypes.GETREPORTBYMONTHYEAR, garageID);
 					Operator operator = new Operator();
 					Report report = new Report();
@@ -308,13 +276,33 @@ public class ParkingGarageClient {
 					report.setYear(year);
 					operator.setReport(report);
 					msg.setOperator(operator);
-					out.writeObject(msg);
-					out.flush();
+					send(msg);
 				} catch (Exception e) {
 					e.printStackTrace();
-
 				}
 				return null;
+			};
+			GUISearchTicketCB operatorGUISearchTicketCallback = (String licensePlate) -> {
+				try {
+					// this function sends a Message to Server indicating that client wants to
+					// serach for a ticket
+					Message msg = new Message(MsgTypes.SEARCHTICKET, garageID);
+					Ticket ticket = new Ticket(licensePlate, garageID);
+					// set entry time to null to show this ticket is not a regular ticket
+					// its a ticket to be search instead;
+					ticket.setEntryTime(null);
+					msg.setTicket(ticket);
+					send(msg);
+				} catch (Exception e) {
+					e.printStackTrace();
+				}
+				return null;
+			};
+
+			OperatorGUISetRateCB operatorGUISetRateCallback = (double rate) -> {
+				// this function let operator to set rate on this Parking Garage w/o contacting
+				// Server
+				setRate(rate);
 			};
 			// === DEFINE THE CALLBACK FUNCTION AND PASS TO THE Operator GUI ===
 
@@ -333,8 +321,19 @@ public class ParkingGarageClient {
 
 	}
 
-	private static void setRate(Message msg) {
-		ratePerSecond = msg.getTicket().getRate();
+	private static void send(Message msg) {
+		synchronized (out) { // ensure sending message one at a time
+			try {
+				out.writeObject(msg);
+				out.flush();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
+		}
+	}
+
+	private static void setRate(double rate) {
+		ratePerSecond = rate;
 		try (FileWriter writer = new FileWriter(garageRateFileName)) { // Opens file
 			writer.write(String.valueOf(ratePerSecond));// Writes to assignedID to file
 		} catch (IOException e) {
