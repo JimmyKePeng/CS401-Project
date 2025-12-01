@@ -180,6 +180,15 @@ public class PGMSOwnerGUI implements Runnable {
 						JOptionPane.INFORMATION_MESSAGE);
 				return;
 			}
+			File file = new File(GlobalVariables.numberOfGarageFilename);
+
+			String garageNumberFromFile;
+			try (Scanner scanner = new Scanner(file)) {
+				garageNumberFromFile = scanner.nextLine().trim();
+				totalGarages = Integer.parseInt(garageNumberFromFile);
+			} catch (FileNotFoundException e) {
+				e.printStackTrace();
+			}
 
 			// if its a reasonable rate and garageID is within the total of Garages
 			if (rate > 0 && rate < 10 && garageID < totalGarages) {
