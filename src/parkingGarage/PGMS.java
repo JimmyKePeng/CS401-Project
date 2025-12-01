@@ -146,7 +146,6 @@ public class PGMS {
 					} else {
 						switch (msgType) { // If the garage is Logged In, Check MsgType and do specific task
 
-						// MsgType NEWTICKET adds Ticket to this garage unpaid txt file
 						// adds Ticket to this garage unpaid txt file
 						// Creates new ticket with RECEIVED MsgType w/ Garage ID and respond to client
 						case NEWTICKET: {

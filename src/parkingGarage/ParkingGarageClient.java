@@ -41,7 +41,7 @@ public class ParkingGarageClient {
 
 		try {
 			// Create a socket to connect to server
-			Socket socket = new Socket("10.0.0.106", 7777);// IP address should replace localhost
+			Socket socket = new Socket("localhost", 7777);// IP address should replace localhost
 
 			// Create ObjectOutputStream from the OutPutStream
 
