@@ -9,6 +9,7 @@ public class GlobalVariables {
 	public static String garageRateFilename = "garageRate.txt";
 	public static String numberOfGarageFilename = "numberOfGarage.txt";
 	public static int port = 7777;
-	public static String host = "134.154.40.114";
+	// public static String host = "localhost";
+	public static String host = "134.154.33.180";
 	public static double initialRate = 0.001;
 }

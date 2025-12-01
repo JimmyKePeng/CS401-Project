@@ -8,6 +8,8 @@ import java.awt.Font;
 import java.awt.GridBagConstraints;
 import java.awt.GridBagLayout;
 import java.awt.Insets;
+import java.time.LocalDateTime;
+import java.time.format.DateTimeFormatter;
 
 import javax.swing.BorderFactory;
 import javax.swing.Box;
@@ -56,6 +58,7 @@ public class OperatorGUI implements Runnable {
 	private JButton loadReportButton;
 	private JTextField searchReportFilenameField;
 	private JTextField filenameField;
+	private JLabel carComesIn;
 	private JTextField monthField;
 	private JTextField yearField;
 	private JButton searchButton;
@@ -308,6 +311,17 @@ public class OperatorGUI implements Runnable {
 		}
 	}
 
+	public void displayLicensePlate(String licensePlate) {
+		SwingUtilities.invokeLater(() -> {
+			LocalDateTime entryDateTime = LocalDateTime.now();
+
+			DateTimeFormatter formatter = DateTimeFormatter.ofPattern("HH:mm:ss");
+			String formatted = entryDateTime.format(formatter);
+
+			carComesIn.setText("License Plate: " + licensePlate + ". Entered at " + formatted);
+		});
+	}
+
 	private void createLoginPanel() {
 		loginPanel = new JPanel(new GridBagLayout());
 		loginPanel.setBorder(BorderFactory.createEmptyBorder(20, 20, 20, 20));
@@ -444,7 +458,8 @@ public class OperatorGUI implements Runnable {
 		logoutButtonPanel.add(logoutButton);
 		controlPanel.add(logoutButtonPanel);
 		controlPanel.add(Box.createVerticalStrut(15));
-
+		carComesIn = new JLabel("xxxxx");
+		controlPanel.add(carComesIn);
 		dashboardPanel.add(controlPanel, BorderLayout.NORTH);
 
 		// Center - Display area for results
