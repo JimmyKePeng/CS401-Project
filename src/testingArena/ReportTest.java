@@ -55,55 +55,49 @@ class ReportTest {
 		assertEquals(90, myReport.getAvgStayTIme());
 	}
 
-	
 	@Test
-	
+
 	void testTotalfee() {
-	Ticket ticket1 = new Ticket();	
-	Ticket ticket2 = new Ticket();
-	
-	ticket1.setFee(3.5);
-	ticket2.setFee(4.2);
-	
-	List<Ticket> tickets = new ArrayList<>();
-	
-	tickets.add(ticket1);
-	tickets.add(ticket2);
-	
-	Report myReport = new Report(7,tickets);
-	
-      double total = myReport.getTotalFee();
-      
-      assertEquals(7.7,total,.0001);
-	
-	
+		List<Ticket> tickets = new ArrayList<>();
+		double totalFee = 0.0;
+		for (int i = 0; i < 100; i++) {
+			Ticket ticket = new Ticket("NoWayWeHaveThisLicensePlate" + i, 1);
+			ticket.calculateFee(1);
+			ticket.setTicketPaid();
+			tickets.add(ticket);
+			totalFee += ticket.getFee();
+		}
+		Report myReport = new Report(7, tickets);
+
+		double totalFeeFromReport = myReport.getTotalFee();
+
+		assertEquals(totalFeeFromReport, totalFee);
+
 	}
-	
-	
-	
+
 	@Test
 	// I'm testing if the toString actually works if it contains the right
 	// information that we assigned in it
 	void testToString() {
-
-		Ticket ticket = new Ticket();
-
-		ticket.setLicensePlate("NoWayWeHaveThisLicensePlate@123");
-		ticket.setFee(5.0);
-		ticket.setTicketPaid(true);
-
 		List<Ticket> tickets = new ArrayList<>();
-		tickets.add(ticket);
 
+		for (int i = 0; i < 100; i++) {
+			Ticket ticket = new Ticket("NoWayWeHaveThisLicensePlate" + i, 1);
+			ticket.calculateFee(1);
+			ticket.setTicketPaid();
+			tickets.add(ticket);
+		}
+
+		// report contain paid tickets only. so we need to set the ticket to paid.
 		Report myReport = new Report(7, tickets);
 
 		String result = myReport.toString();
-
-		assertTrue(result.contains("7,"));
-		assertTrue(result.contains("NoWayWeHaveThisLicensePlate@123"));
-		assertTrue(result.contains("5.0"));
-		assertFalse(result.isEmpty());
-
+		for (int i = 0; i < 100; i++) {
+			assertTrue(result.contains("7,"));
+			assertTrue(result.contains("NoWayWeHaveThisLicensePlate" + i));
+			assertTrue(result.contains("1"));
+			assertFalse(result.isEmpty());
+		}
 	}
 
 }

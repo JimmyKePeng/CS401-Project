@@ -18,9 +18,7 @@ public class ParkingGarageClient {
 	private static DriverGUI driverGUI1;
 	private static DriverGUI driverGUI2;
 	private static OperatorGUI operatorGUI;
-	private static volatile double ratePerSecond = 0.001;
-	private static String garageIDFileName = "garageId.txt";
-	private static String garageRateFileName = "garageRate.txt";
+	private static volatile double ratePerSecond = GlobalVariables.initialRate;
 	private static ObjectOutputStream out;
 	private static ObjectInputStream in;
 
@@ -41,7 +39,7 @@ public class ParkingGarageClient {
 
 		try {
 			// Create a socket to connect to server
-			Socket socket = new Socket("localhost", 7777);// IP address should replace localhost
+			Socket socket = new Socket(GlobalVariables.host, GlobalVariables.port);
 
 			// Create ObjectOutputStream from the OutPutStream
 
@@ -51,7 +49,7 @@ public class ParkingGarageClient {
 			// Create ObjectInputStream from the InputStream
 			in = new ObjectInputStream(socket.getInputStream());
 
-			File file = new File(garageIDFileName);
+			File file = new File(GlobalVariables.garageIDFilename);
 
 			// check if this garage is already registered
 			// if a garage is registered, there's a file saved garageID, a file saved rate
@@ -66,7 +64,7 @@ public class ParkingGarageClient {
 				assignedID = Integer.parseInt(garageNumber);
 
 				// read parking rate from file
-				File rateFile = new File(garageRateFileName);
+				File rateFile = new File(GlobalVariables.garageRateFilename);
 				try (Scanner scanner = new Scanner(rateFile)) {
 					parkingRate = scanner.nextLine().trim();
 				}
@@ -92,10 +90,10 @@ public class ParkingGarageClient {
 				if (!loggedIn && inMsg.getMsgType() == MsgTypes.SUCCESS) {
 					loggedIn = true;
 					assignedID = inMsg.getGarageID();
-					try (FileWriter writer = new FileWriter(garageIDFileName)) { // Opens file
+					try (FileWriter writer = new FileWriter(GlobalVariables.garageIDFilename)) { // Opens file
 						writer.write(String.valueOf(assignedID));// Writes assignedID to file
 					}
-					try (FileWriter writer = new FileWriter(garageRateFileName)) { // Opens file
+					try (FileWriter writer = new FileWriter(GlobalVariables.garageRateFilename)) { // Opens file
 						writer.write(String.valueOf(ratePerSecond));// Writes default rate to file
 					}
 				}
@@ -334,7 +332,7 @@ public class ParkingGarageClient {
 
 	private static void setRate(double rate) {
 		ratePerSecond = rate;
-		try (FileWriter writer = new FileWriter(garageRateFileName)) { // Opens file
+		try (FileWriter writer = new FileWriter(GlobalVariables.garageRateFilename)) { // Opens file
 			writer.write(String.valueOf(ratePerSecond));// Writes to assignedID to file
 		} catch (IOException e) {
 			e.printStackTrace();
