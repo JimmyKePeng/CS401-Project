@@ -28,10 +28,7 @@ import javax.swing.SwingUtilities;
 
 public class PGMSOwnerGUI implements Runnable {
 
-	// private boolean isConnected = false;
-	private boolean isLoggedIn = false;
-	private final Object fileLockHandler = new Object();
-	private String ownerPwFileName = "owner_pw.txt";
+	private final String ownerPwFileName = "owner_pw.txt";
 	private int totalGarages;
 
 	// After GUI displayed a report, there's an option to save this report
@@ -143,7 +140,6 @@ public class PGMSOwnerGUI implements Runnable {
 	// pw/username is authenticated
 	public void loggedInSuccess() {
 		SwingUtilities.invokeLater(() -> {
-			isLoggedIn = true;
 			passwordField.setText("");
 			usernameField.setText("");
 			mainFrame.setContentPane(dashboardPanel);
