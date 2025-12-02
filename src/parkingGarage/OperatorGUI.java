@@ -311,6 +311,7 @@ public class OperatorGUI implements Runnable {
 		}
 	}
 
+	// display the entered car's license plate on the GUI
 	public void displayLicensePlate(String licensePlate) {
 		SwingUtilities.invokeLater(() -> {
 			LocalDateTime entryDateTime = LocalDateTime.now();

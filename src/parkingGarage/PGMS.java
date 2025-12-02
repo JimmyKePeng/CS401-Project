@@ -403,7 +403,7 @@ public class PGMS {
 					return t;
 				}
 			}
-			tickets = loadpaidTicket();
+			tickets = loadUnpaidTicket();
 			for (Ticket t : tickets) {
 				if (t.getLicensePlate().equals(ticket.getLicensePlate())) {
 					return t;

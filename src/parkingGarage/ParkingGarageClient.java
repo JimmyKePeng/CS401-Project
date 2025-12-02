@@ -113,7 +113,10 @@ public class ParkingGarageClient {
 				try {
 					while (running) {
 						String plate = queue.take(); // Queue will wait (block) until there is a plate in the queue
+
+						// Display the car's license plate when they entered on OperatorGUI
 						operatorGUI.displayLicensePlate(plate);
+
 						// A new ticket object is made with the plate taken from the queue
 						Ticket ticket = new Ticket(plate, garageID);
 						Message Msg = new Message(MsgTypes.NEWTICKET, garageID);
