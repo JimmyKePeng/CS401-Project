@@ -1,5 +1,11 @@
 package parkingGarage;
 
+/*PaymentCollector, or the payment processor, would also realistically 
+	receive information from us, the vendor, to process payment.
+	Payment processor would manipulate information received 
+	though this is would be abstract to us, since their API would
+	be the most we would associate with. 
+	*/
 public class PaymentCollector {
 
 	private CreditCard card;
@@ -8,8 +14,8 @@ public class PaymentCollector {
 		this.card = card;
 	};
 
+	// paymentCollect validate a credit card by check the number of digits.
 	public boolean validatePayment() {
-		// if card number is 16 digits, we will pretend its valid card
-		return card.getCardNum().length() == 20;
+	  return card.getCardNum().length() <= 20 && card.getCardNum().length() > 13; //validates length of CC 
 	}
 }
